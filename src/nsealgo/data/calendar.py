@@ -84,6 +84,13 @@ def classify_short_sessions(
     return pd.DataFrame(rows, columns=["session_date", "max_raw_bars", "status", "reason"])
 
 
+def full_sessions(calendar: pd.DataFrame, min_bars: int) -> list[date]:
+    """Sessions with at least `min_bars` bars (max over symbols): the ones fit for
+    volume averages. Partial sessions (outages) are left out; a full no_trade session
+    such as the day after an outage stays in."""
+    return list(calendar.loc[calendar["max_bars"] >= min_bars, "session_date"])
+
+
 def tradeable_sessions(calendar: pd.DataFrame) -> list[date]:
     """Sessions on which the engine may open trades (no_trade sessions removed)."""
     return list(calendar.loc[~calendar["no_trade"], "session_date"])

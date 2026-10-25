@@ -7,6 +7,7 @@ from nsealgo.data.calendar import (
     IST,
     build_calendar,
     classify_short_sessions,
+    full_sessions,
     load_holidays,
     tradeable_sessions,
 )
@@ -103,5 +104,27 @@ def test_repo_configs_load():
     assert cfg.clean_start == date(2016, 1, 1)
     assert cfg.clean_end == date(2026, 4, 7)
     assert date(2025, 10, 21) in cfg.excluded()
-    assert set(cfg.no_trade()) == {date(2017, 7, 10), date(2021, 2, 24)}
+    assert cfg.no_trade() == {
+        date(2017, 7, 10): "nse_outage",
+        date(2021, 2, 24): "nse_outage",
+        date(2021, 2, 25): "prev_session_outage_close",
+    }
     assert load_holidays(REPO_ROOT / "config" / "holidays.csv") == set()
+
+
+def test_day_after_early_close_outage_is_no_trade_but_full():
+    cfg = load_data_config()
+    bars = pd.DataFrame(
+        {
+            "symbol": ["A", "A", "A"],
+            "session_date": [date(2021, 2, 23), date(2021, 2, 24), date(2021, 2, 25)],
+            "n_bars": [375, 149, 375],
+        }
+    )
+    cal = build_calendar(bars, cfg.no_trade(), set()).set_index("session_date")
+    after = date(2021, 2, 25)
+    assert cal.at[after, "no_trade"]
+    assert cal.at[after, "no_trade_reason"] == "prev_session_outage_close"
+    assert tradeable_sessions(cal.reset_index()) == [date(2021, 2, 23)]
+    # Still a full session: it stays in volume-average windows; the outage day does not.
+    assert full_sessions(cal.reset_index(), 300) == [date(2021, 2, 23), after]

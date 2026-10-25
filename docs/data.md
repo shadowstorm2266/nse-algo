@@ -38,6 +38,10 @@ Query through `nsealgo.data.store.connect()`: views `bars_1m`, `bars_5m`, `bars_
   09:15:00 .. 09:29:59 and is available at 09:30:00.
 - Daily features use sessions strictly before D, need complete windows, and are NaN
   until a symbol has 20 prior sessions. Nothing is filled. ATR(14) is the simple mean
-  of the last 14 true ranges. RVOL windows skip `no_trade` sessions (partial days).
+  of the last 14 true ranges. RVOL windows skip short sessions (< 300 bars, i.e. the
+  outage days) but keep full no_trade sessions.
+- 2021-02-25 is `no_trade` (`prev_session_outage_close`): its previous-session values
+  come from 2021-02-24, whose stored close is from ~11:40 (trading resumed 15:45-17:00,
+  outside our window).
 - `config/holidays.csv` is for live/paper trading only; the historical calendar comes
   from the data.

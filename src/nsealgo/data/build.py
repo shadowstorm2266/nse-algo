@@ -15,6 +15,7 @@ from nsealgo.data.calendar import (
     BARS_PER_SESSION,
     build_calendar,
     classify_short_sessions,
+    full_sessions,
 )
 from nsealgo.data.config import DataConfig
 from nsealgo.data.features import daily_bars, daily_features, rvol_profile
@@ -146,7 +147,7 @@ def finish(
         raw_counts, cfg.excluded(), cfg.no_trade(), cfg.quality.short_session_bars
     )
     sessions = list(calendar["session_date"])
-    complete = list(calendar.loc[~calendar["no_trade"], "session_date"])
+    complete = full_sessions(calendar, cfg.quality.short_session_bars)
     for r in results:
         feats = daily_features(
             r.daily, sessions, cfg.feature_warmup_sessions, cfg.atr_period, cfg.avg_window_sessions

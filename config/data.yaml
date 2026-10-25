@@ -33,6 +33,9 @@ excluded_sessions:
 no_trade_sessions:
   - { date: 2017-07-10, reason: nse_outage }
   - { date: 2021-02-24, reason: nse_outage }
+  # Full session, but prev_* / ATR come from 2021-02-24, whose stored close is ~11:40
+  # (trading resumed 15:45-17:00, outside our window).
+  - { date: 2021-02-25, reason: prev_session_outage_close }
 
 quality:
   # A 1m bar is a suspect print if any of its prices is more than bad_print_max_dev away from
