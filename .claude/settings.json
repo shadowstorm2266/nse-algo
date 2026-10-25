@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Edit(./.env)",
+      "Edit(./LIVE_ARMED)",
+      "Bash(cat .env*)",
+      "Bash(touch LIVE_ARMED*)",
+      "Bash(git push --force*)",
+      "Bash(uv run python -m nsealgo.live --mode live*)"
+    ]
+  }
+}
