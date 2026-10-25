@@ -1,0 +1,40 @@
+# Trading costs. Percentages are in percent (0.025 means 0.025%).
+# Statutory rates as of Oct 2026; re-verify before going live.
+
+statutory:
+  transaction_charge_pct: 0.00297   # NSE, both legs
+  sebi_fee_per_crore: 10            # rupees per crore of turnover, both legs
+  gst_pct: 18                       # on brokerage + transaction charge + SEBI fee
+  intraday:
+    stt_sell_pct: 0.025
+    stamp_buy_pct: 0.003
+  delivery:
+    stt_buy_pct: 0.1
+    stt_sell_pct: 0.1
+    stamp_buy_pct: 0.015
+
+brokerage:
+  # Brokerage is charged per executed order (each leg).
+  # model: zero | flat_or_pct (lower of flat_rupees and pct of order value) | flat
+  active: shoonya
+  presets:
+    zero:
+      model: zero
+    shoonya:
+      model: flat_or_pct
+      flat_rupees: 5
+      pct: 0.03
+    dhan:
+      model: flat_or_pct
+      flat_rupees: 20
+      pct: 0.03
+
+# Depository charge per scrip on each sell day (delivery only), as billed
+# INCLUDING GST. Conservative placeholder: replace with your broker's figure.
+dp_charge_per_scrip_rupees: 20
+
+# Slippage tiers, basis points per side, applied to fill prices by the simulator.
+slippage_bps_per_side:
+  base: 3
+  stress1: 6
+  stress2: 10

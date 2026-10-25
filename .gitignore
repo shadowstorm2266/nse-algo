@@ -1,0 +1,20 @@
+# runtime / private
+/data/
+/logs/
+/state/
+.env
+.env.*
+!.env.example
+/LIVE_ARMED
+/KILL
+
+# python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+.hypothesis/
+*.egg-info/
+dist/
+build/

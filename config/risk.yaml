@@ -1,0 +1,13 @@
+# Risk limits. Enforced only by src/nsealgo/engine/risk.py (RiskGovernor).
+# Change only on explicit human instruction.
+capital: 20000
+risk_per_trade_rupees: 100
+max_trades_per_day: 2
+max_daily_loss_rupees: 300
+max_gross_exposure_rupees: 60000
+entry_start: "09:45"   # IST
+entry_end: "14:00"     # IST
+flat_by: "14:50"       # IST, every MIS position flat
+max_positions_per_symbol: 1
+account_drawdown_halt_pct: 15
+live_enabled: false    # human-only switch
