@@ -53,6 +53,15 @@ class BrokerageModel:
 
 
 @dataclass(frozen=True)
+class BrokerPreset:
+    """A broker's charges: per-order brokerage by product, and DP charge before GST."""
+
+    intraday: BrokerageModel
+    delivery: BrokerageModel
+    dp_charge_per_scrip: Decimal
+
+
+@dataclass(frozen=True)
 class StatutoryRates:
     """Statutory rates; every `*_pct` field is in percent."""
 
@@ -83,13 +92,12 @@ class CostBreakdown:
 @dataclass(frozen=True)
 class CostConfig:
     rates: StatutoryRates
-    brokerage_presets: dict[str, BrokerageModel]
+    brokerage_presets: dict[str, BrokerPreset]
     active_brokerage: str
-    dp_charge_per_scrip: Decimal
     slippage_bps_per_side: dict[str, Decimal]
 
     @property
-    def brokerage(self) -> BrokerageModel:
+    def broker(self) -> BrokerPreset:
         return self.brokerage_presets[self.active_brokerage]
 
 
@@ -109,7 +117,7 @@ def _build(
 ) -> CostBreakdown:
     txn = _pct(turnover, rates.transaction_charge_pct)
     sebi = turnover * rates.sebi_fee_per_crore / CRORE
-    gst = _pct(brokerage + txn + sebi, rates.gst_pct)
+    gst = _pct(brokerage + txn + sebi + dp_charge, rates.gst_pct)
     parts = [_paisa(p) for p in (brokerage, stt, txn, sebi, stamp, gst, dp_charge)]
     return CostBreakdown(*parts, total=sum(parts, Decimal(0)))
 
@@ -139,7 +147,7 @@ def delivery_round_trip(
 ) -> CostBreakdown:
     """Charges for one CNC buy and one CNC sell of a single scrip (one DP charge).
 
-    The DP charge is taken as billed (GST-inclusive) and is not added to the GST base.
+    `dp_charge_per_scrip` is before GST; GST is charged on it with the other fees.
     """
     buy, sell = _dec(buy_value), _dec(sell_value)
     _validate_values(buy, sell)
@@ -163,6 +171,14 @@ def _parse_brokerage(raw: dict[str, Any]) -> BrokerageModel:
     return BrokerageModel(kind, flat_rupees=_dec(raw["flat_rupees"]), pct=pct)
 
 
+def _parse_preset(raw: dict[str, Any]) -> BrokerPreset:
+    return BrokerPreset(
+        intraday=_parse_brokerage(raw["intraday"]),
+        delivery=_parse_brokerage(raw["delivery"]),
+        dp_charge_per_scrip=_dec(raw["dp_charge_per_scrip_rupees"]),
+    )
+
+
 def load_cost_config(path: Path) -> CostConfig:
     """Parse config/costs.yaml. Missing keys raise KeyError rather than defaulting."""
     with path.open(encoding="utf-8") as fh:
@@ -178,7 +194,7 @@ def load_cost_config(path: Path) -> CostConfig:
         delivery_stt_sell_pct=_dec(st["delivery"]["stt_sell_pct"]),
         delivery_stamp_buy_pct=_dec(st["delivery"]["stamp_buy_pct"]),
     )
-    presets = {name: _parse_brokerage(p) for name, p in raw["brokerage"]["presets"].items()}
+    presets = {name: _parse_preset(p) for name, p in raw["brokerage"]["presets"].items()}
     active = raw["brokerage"]["active"]
     if active not in presets:
         raise ValueError(f"active brokerage preset {active!r} not in presets")
@@ -186,6 +202,5 @@ def load_cost_config(path: Path) -> CostConfig:
         rates=rates,
         brokerage_presets=presets,
         active_brokerage=active,
-        dp_charge_per_scrip=_dec(raw["dp_charge_per_scrip_rupees"]),
         slippage_bps_per_side={k: _dec(v) for k, v in raw["slippage_bps_per_side"].items()},
     )

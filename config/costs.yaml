@@ -4,7 +4,7 @@
 statutory:
   transaction_charge_pct: 0.00297   # NSE, both legs
   sebi_fee_per_crore: 10            # rupees per crore of turnover, both legs
-  gst_pct: 18                       # on brokerage + transaction charge + SEBI fee
+  gst_pct: 18                       # on brokerage + transaction + SEBI fee (+ DP charge)
   intraday:
     stt_sell_pct: 0.025
     stamp_buy_pct: 0.003
@@ -14,24 +14,35 @@ statutory:
     stamp_buy_pct: 0.015
 
 brokerage:
-  # Brokerage is charged per executed order (each leg).
+  # Brokerage is charged per executed order (each leg), separately for
+  # intraday (MIS) and delivery (CNC).
   # model: zero | flat_or_pct (lower of flat_rupees and pct of order value) | flat
+  # dp_charge_per_scrip_rupees: per scrip on each delivery sell day, BEFORE GST;
+  # costs.py adds GST on top.
   active: shoonya
   presets:
-    zero:
-      model: zero
+    zero:  # reference tier: no broker charges, statutory only
+      intraday:
+        model: zero
+      delivery:
+        model: zero
+      dp_charge_per_scrip_rupees: 0
     shoonya:
-      model: flat_or_pct
-      flat_rupees: 5
-      pct: 0.03
+      intraday:
+        model: flat_or_pct
+        flat_rupees: 5
+        pct: 0.03
+      delivery:
+        model: zero
+      dp_charge_per_scrip_rupees: 9
     dhan:
-      model: flat_or_pct
-      flat_rupees: 20
-      pct: 0.03
-
-# Depository charge per scrip on each sell day (delivery only), as billed
-# INCLUDING GST. Conservative placeholder: replace with your broker's figure.
-dp_charge_per_scrip_rupees: 20
+      intraday:
+        model: flat_or_pct
+        flat_rupees: 20
+        pct: 0.03
+      delivery:
+        model: zero
+      dp_charge_per_scrip_rupees: 12.50
 
 # Slippage tiers, basis points per side, applied to fill prices by the simulator.
 slippage_bps_per_side:
