@@ -1,8 +1,9 @@
 # Research periods (inclusive dates, YYYY-MM-DD, Asia/Kolkata sessions).
-# TODO: fill in once the available data range is known.
+# Clean data covers 2016-01-01 .. 2026-04-07 (see config/data.yaml).
 # Backtests must never touch dates >= holdout_start without "run holdout".
-dev_start: TODO
-dev_end: TODO
-validation_start: TODO
-validation_end: TODO
-holdout_start: TODO
+dev_start: 2016-01-01
+dev_end: 2023-12-31
+validation_start: 2024-01-01
+validation_end: 2025-04-07
+holdout_start: 2025-04-08
+holdout_end: 2026-04-07

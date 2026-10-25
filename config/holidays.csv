@@ -1,0 +1,4 @@
+# NSE trading holidays, for LIVE/PAPER trading only (future sessions).
+# The historical calendar comes from the data itself; do not use this file to edit history.
+# Fill from the official NSE holiday circular each year. One row per date, YYYY-MM-DD.
+date,description

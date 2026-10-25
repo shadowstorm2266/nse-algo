@@ -1,0 +1,62 @@
+symbol,session_date,ts,kind,action,detail
+ADANIENT,2018-09-06,,overnight_move,flagged,prev_close=203.9 open=145.4 move=-28.7%
+ADANIENT,2020-04-27,,out_of_session,dropped_rows,1
+ADANIENT,2023-02-02,2023-02-02 09:15:00+05:30,suspect_print,flagged,1 suspect bar(s); first o=2277.2 h=2277.2 l=2055.1 c=2055.1; day has 375 bars
+ADANIENT,2023-02-09,2023-02-09 09:15:00+05:30,suspect_print,flagged,1 suspect bar(s); first o=2101.8 h=2101.8 l=1888.4 c=1888.4; day has 375 bars
+ADANIENT,2023-02-27,,out_of_line_day,flagged,close=1151.7 centered_median=1755.70 ratio=0.66
+ADANIPORTS,2023-02-02,,out_of_line_day,flagged,close=459.7 centered_median=685.85 ratio=0.67
+ADANIPORTS,2023-02-02,2023-02-02 09:15:00+05:30,suspect_print,flagged,1 suspect bar(s); first o=510.0 h=515.15 l=462.5 c=462.5; day has 375 bars
+AXISBANK,2020-03-23,,out_of_line_day,flagged,close=310.0 centered_median=455.43 ratio=0.68
+AXISBANK,2020-03-24,,out_of_line_day,flagged,close=304.7 centered_median=448.60 ratio=0.68
+AXISBANK,2020-04-27,,out_of_session,dropped_rows,1
+BAJAJ-AUTO,2020-03-23,2020-03-23 10:57:00+05:30,suspect_print,flagged,1 suspect bar(s); first o=1980.0 h=2330.0 l=1970.0 c=2056.5; day has 317 bars
+BAJAJ-AUTO,2020-04-27,,out_of_session,dropped_rows,1
+BAJAJFINSV,2016-11-09,2016-11-09 09:15:00+05:30,suspect_print,flagged,1 suspect bar(s); first o=280.0 h=280.0 l=248.0 c=258.5; day has 375 bars
+BAJAJFINSV,2020-04-27,,out_of_session,dropped_rows,1
+BAJFINANCE,2020-04-27,,out_of_session,dropped_rows,1
+BHARTIARTL,2020-03-13,2020-03-13 10:21:00+05:30,suspect_print,flagged,2 suspect bar(s); first o=422.1 h=498.65 l=417.15 c=498.65; day has 316 bars
+BHARTIARTL,2020-04-27,,out_of_session,dropped_rows,1
+BHARTIARTL,2024-06-25,2024-06-25 09:15:00+05:30,ohlc_inconsistent,flagged,o=1434.0 h=1429.85 l=1423.75 c=1425.2
+BPCL,2018-10-05,2018-10-05 09:15:00+05:30,suspect_print,flagged,1 suspect bar(s); first o=120.2 h=120.2 l=112.6 c=112.6; day has 375 bars
+BPCL,2020-03-12,2020-03-12 15:29:00+05:30,suspect_print,flagged,1 suspect bar(s); first o=149.95 h=164.7 l=149.95 c=164.7; day has 375 bars
+BPCL,2020-03-13,2020-03-13 09:19:00+05:30,suspect_print,flagged,2 suspect bar(s); first o=133.65 h=133.85 l=117.4 c=121.8; day has 316 bars
+CIPLA,2020-04-27,,out_of_session,dropped_rows,1
+DRREDDY,2019-02-15,2019-02-15 10:14:00+05:30,suspect_print,flagged,1 suspect bar(s); first o=454.0 h=454.4 l=374.6 c=429.5; day has 375 bars
+DRREDDY,2019-06-04,2019-06-04 09:40:00+05:30,suspect_print,flagged,2 suspect bar(s); first o=552.8 h=553.0 l=481.55 c=481.95; day has 375 bars
+DRREDDY,2020-03-13,2020-03-13 10:21:00+05:30,suspect_print,flagged,2 suspect bar(s); first o=528.5 h=627.1 l=524.1 c=540.0; day has 316 bars
+EICHERMOT,2020-03-23,2020-03-23 10:57:00+05:30,suspect_print,flagged,1 suspect bar(s); first o=1478.0 h=1724.0 l=1435.15 c=1466.95; day has 317 bars
+EICHERMOT,2020-04-27,,out_of_session,dropped_rows,1
+GRASIM,2017-07-19,,overnight_move,flagged,prev_close=1306.3 open=1065.8 move=-18.4%
+GRASIM,2020-03-13,2020-03-13 10:22:00+05:30,suspect_print,flagged,2 suspect bar(s); first o=609.2 h=625.6 l=545.1 c=567.8; day has 316 bars
+GRASIM,2020-04-27,,out_of_session,dropped_rows,1
+HDFCBANK,2020-04-27,,out_of_session,dropped_rows,1
+HDFCBANK,2024-06-25,2024-06-25 09:15:00+05:30,ohlc_inconsistent,flagged,o=835.6 h=839.8 l=837.4 c=839.6
+HINDALCO,2020-04-27,,out_of_session,dropped_rows,1
+HINDUNILVR,2020-04-27,,out_of_session,dropped_rows,1
+ICICIBANK,2024-06-25,2024-06-25 09:15:00+05:30,ohlc_inconsistent,flagged,o=1170.25 h=1174.35 l=1171.0 c=1171.75
+INDUSINDBK,2020-03-24,,out_of_line_day,flagged,close=313.6 centered_median=462.95 ratio=0.68
+INDUSINDBK,2020-03-25,,out_of_line_day,flagged,close=301.95 centered_median=459.07 ratio=0.66
+INDUSINDBK,2020-04-27,,out_of_session,dropped_rows,1
+INFY,2020-04-27,,out_of_session,dropped_rows,1
+JSWSTEEL,2020-04-27,,out_of_session,dropped_rows,1
+KOTAKBANK,2020-03-13,2020-03-13 09:21:00+05:30,suspect_print,flagged,1 suspect bar(s); first o=252.6 h=252.6 l=234.4 c=234.4; day has 316 bars
+KOTAKBANK,2020-04-27,,out_of_session,dropped_rows,1
+MARUTI,2020-04-27,,out_of_session,dropped_rows,1
+NTPC,2020-03-13,2020-03-13 09:15:00+05:30,suspect_print,flagged,1 suspect bar(s); first o=90.0 h=92.0 l=86.15 c=86.15; day has 316 bars
+NTPC,2020-04-27,,out_of_session,dropped_rows,1
+ONGC,2020-03-18,2020-03-18 15:12:00+05:30,suspect_print,flagged,3 suspect bar(s); first o=60.25 h=64.85 l=59.85 c=64.8; day has 375 bars
+ONGC,2020-03-23,,overnight_move,flagged,prev_close=64.65 open=54.8 move=-15.2%
+ONGC,2020-04-27,,out_of_session,dropped_rows,1
+POWERGRID,2020-04-27,,out_of_session,dropped_rows,1
+RELIANCE,2020-03-19,,out_of_line_day,flagged,close=433.3 centered_median=624.98 ratio=0.69
+RELIANCE,2020-03-23,,out_of_line_day,flagged,close=420.7 centered_median=624.98 ratio=0.67
+RELIANCE,2020-04-27,,out_of_session,dropped_rows,1
+SUNPHARMA,2019-05-13,2019-05-13 14:58:00+05:30,suspect_print,flagged,2 suspect bar(s); first o=383.65 h=387.7 l=348.85 c=352.0; day has 375 bars
+TATASTEEL,2020-04-27,,out_of_session,dropped_rows,1
+TCS,2020-04-27,,out_of_session,dropped_rows,1
+TECHM,2020-03-13,2020-03-13 09:15:00+05:30,suspect_print,flagged,1 suspect bar(s); first o=564.9 h=572.4 l=546.9 c=547.6; day has 316 bars
+TITAN,2020-03-13,2020-03-13 10:22:00+05:30,suspect_print,flagged,1 suspect bar(s); first o=1009.8 h=1080.0 l=974.0 c=980.85; day has 316 bars
+ULTRACEMCO,2020-03-13,2020-03-13 10:21:00+05:30,suspect_print,flagged,1 suspect bar(s); first o=3300.0 h=4011.5 l=3114.0 c=3890.0; day has 316 bars
+ULTRACEMCO,2020-04-27,,out_of_session,dropped_rows,1
+WIPRO,2020-03-13,2020-03-13 09:15:00+05:30,suspect_print,flagged,1 suspect bar(s); first o=95.1 h=95.1 l=86.5 c=86.8; day has 316 bars
+WIPRO,2020-04-27,,out_of_session,dropped_rows,1

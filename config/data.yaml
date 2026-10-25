@@ -1,0 +1,51 @@
+# Historical data layer (scripts/build_data.py). data/raw is never modified;
+# data/clean is rebuilt from scratch on every run.
+raw_dir: data/raw
+clean_dir: data/clean
+clean_start: 2016-01-01
+clean_end: 2026-04-07 # raw 2026-04-08 is a partial session (cut off mid-day for 11 symbols)
+
+# Daily features stay NaN until a symbol has this many prior sessions. Never filled.
+feature_warmup_sessions: 20
+atr_period: 14
+avg_window_sessions: 20
+
+# Universe: top N by median daily turnover in the first year of clean data.
+universe_size: 40
+
+# Removed from the calendar and from data/clean entirely.
+# The build fails if any of these has >= short_session_bars bars (a typo would drop a real session).
+excluded_sessions:
+  - { date: 2016-10-30, reason: muhurat }
+  - { date: 2017-10-19, reason: muhurat }
+  - { date: 2018-11-07, reason: muhurat }
+  - { date: 2019-10-27, reason: muhurat }
+  - { date: 2020-11-14, reason: muhurat }
+  - { date: 2021-11-04, reason: muhurat }
+  - { date: 2022-10-24, reason: muhurat }
+  - { date: 2023-11-12, reason: muhurat }
+  - { date: 2024-11-01, reason: muhurat }
+  - { date: 2025-10-21, reason: muhurat }
+  - { date: 2024-03-02, reason: dr_site_saturday }
+  - { date: 2024-05-18, reason: dr_site_saturday }
+
+# Kept in data and calendar, marked no_trade = true. The engine must never open a trade on these.
+no_trade_sessions:
+  - { date: 2017-07-10, reason: nse_outage }
+  - { date: 2021-02-24, reason: nse_outage }
+
+quality:
+  # A 1m bar is a suspect print if any of its prices is more than bad_print_max_dev away from
+  # BOTH the median close of the previous and of the next bad_print_lookaround bars
+  # (same session). A real jump sits near one side; a spike sits away from both.
+  # FLAG ONLY (human decision 2026-10-26): it also fires on real crashes and circuit-halt
+  # days, so nothing is dropped; days are listed as suspect_print in the events CSV.
+  bad_print_max_dev: 0.10
+  bad_print_lookaround: 5
+  overnight_move_flag: 0.15
+  short_session_bars: 300
+  # "Different company" check (QA only, uses a centered window): daily close outside
+  # [low, high] x the centered rolling median close.
+  out_of_line_window_sessions: 60
+  out_of_line_low: 0.7
+  out_of_line_high: 1.4

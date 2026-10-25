@@ -1,0 +1,15 @@
+session_date,max_raw_bars,status,reason
+2016-10-30,60,excluded,muhurat
+2017-07-10,180,no_trade,nse_outage
+2017-10-19,60,excluded,muhurat
+2018-11-07,60,excluded,muhurat
+2019-10-27,60,excluded,muhurat
+2020-11-14,60,excluded,muhurat
+2021-02-24,149,no_trade,nse_outage
+2021-11-04,60,excluded,muhurat
+2022-10-24,60,excluded,muhurat
+2023-11-12,60,excluded,muhurat
+2024-03-02,105,excluded,dr_site_saturday
+2024-05-18,105,excluded,dr_site_saturday
+2024-11-01,60,excluded,muhurat
+2025-10-21,60,excluded,muhurat
