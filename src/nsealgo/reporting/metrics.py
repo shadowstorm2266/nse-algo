@@ -10,7 +10,8 @@ Definitions (per round trip; partial exits of one trade are summed first):
   (`current_equity` sizing, compounding) or over capital (`fixed_capital` sizing, where
   sizes do not compound and equity may go below zero).
 - Max drawdown from session-end equity: peak minus equity, in rupees and as a percent
-  of the running peak (the peak starts at capital).
+  of the running peak (the peak starts at capital), or of capital with `fixed_capital`
+  sizing (sizes do not grow with the peak, and equity may be below zero).
 """
 
 import math
@@ -79,7 +80,8 @@ def equity_metrics(
     equity: pd.DataFrame, capital: float, return_base: float | None = None
 ) -> dict[str, Any]:
     """`capital` is the equity before the first row. Returns are P&L over the previous
-    equity, or over `return_base` when given (fixed-capital sizing)."""
+    equity and the drawdown percent is of the running peak, or both are over
+    `return_base` when given (fixed-capital sizing)."""
     if equity.empty:
         return {
             "sessions": 0,
@@ -101,7 +103,9 @@ def equity_metrics(
         "final_equity": float(eq[-1]),
         "total_return_pct": float((eq[-1] - capital) / (return_base or capital) * 100),
         "max_drawdown_rs": float(dd.max()),
-        "max_drawdown_pct": float((dd / peak).max() * 100),
+        "max_drawdown_pct": float(
+            dd.max() / return_base * 100 if return_base else (dd / peak).max() * 100
+        ),
         "sharpe_daily_annualized": float(rets.mean() / sd * math.sqrt(TRADING_DAYS))
         if sd > 0
         else None,

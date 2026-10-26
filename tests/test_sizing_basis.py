@@ -193,6 +193,18 @@ def test_fixed_capital_returns_are_pnl_over_capital():
     assert math.isfinite(neg["sharpe_daily_annualized"])
 
 
+def test_fixed_capital_drawdown_pct_is_of_capital():
+    eq = pd.DataFrame({"equity": [19000.0, 25000.0, 15000.0]})
+    fixed = equity_metrics(eq, 20000.0, return_base=20000.0)
+    assert fixed["max_drawdown_rs"] == pytest.approx(10000.0)
+    assert fixed["max_drawdown_pct"] == pytest.approx(50.0)  # 10,000 of 20,000 capital
+    assert equity_metrics(eq, 20000.0)["max_drawdown_pct"] == pytest.approx(40.0)  # of 25,000
+    below_zero = equity_metrics(pd.DataFrame({"equity": [-1000.0, -6000.0]}), 20000.0, 20000.0)
+    assert below_zero["max_drawdown_pct"] == pytest.approx(130.0)  # 26,000 of 20,000
+    logged = compute_metrics(pd.DataFrame(), eq, 20000.0, sizing_basis="fixed_capital")
+    assert logged["max_drawdown_pct"] == pytest.approx(50.0)
+
+
 def test_compute_metrics_records_the_basis():
     eq = pd.DataFrame({"equity": [19000.0, 18000.0, 19000.0]})
     fixed = compute_metrics(pd.DataFrame(), eq, 20000.0, sizing_basis="fixed_capital")

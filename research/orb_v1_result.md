@@ -148,9 +148,10 @@ Bottom 5:
 Same strategy version, parameters, period and base tier; every session sized off Rs
 20,000 with no compounding (`sizing_basis.backtest: fixed_capital`, commit 11ad478).
 Equity is the real cumulative account, so it goes below zero (final Rs -46,066). Max
-DD % in the summary row is of the running peak, as logged; the by-year Max DD % is the
-in-year drawdown as a percent of the Rs 20,000 capital. Daily returns for Sharpe are
-P&L / capital.
+DD % in the summary row is of the running peak, as logged for trial 7; later
+fixed-capital runs log it as a percent of capital, which here is 333.2% (Rs 66,648 of
+Rs 20,000). The by-year Max DD % is the in-year drawdown as a percent of the Rs 20,000
+capital. Daily returns for Sharpe are P&L / capital.
 
 | Run | Ref tier | Sizing | Trades | Win % | Avg win Rs | Avg loss Rs | Gross bps | Cost bps | Net bps | PF | Max DD Rs | Max DD % | Sharpe (daily, ann.) | Net Rs | Skipped groups |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|

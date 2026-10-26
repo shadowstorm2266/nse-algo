@@ -175,6 +175,8 @@ From session-end equity:
 - Sharpe = mean / std (ddof 1) of daily returns x sqrt(252), every session counted. A
   daily return is the session's P&L over the previous session-end equity
   (`current_equity`) or over capital (`fixed_capital`, where equity can go below zero).
+- Max drawdown % is of the running peak (`current_equity`) or of capital
+  (`fixed_capital`).
 - `sizing_basis` is recorded in `metrics.json` and in the trial record.
 
 ## Holdout lock

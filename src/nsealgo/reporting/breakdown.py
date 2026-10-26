@@ -23,14 +23,11 @@ def yearly_equity(equity: pd.DataFrame, capital: float, fixed_capital: bool) -> 
     """`equity_metrics` per calendar year. Each year starts from the previous year's last
     session-end equity (the first from `capital`), so returns and drawdowns are in-year.
     With fixed-capital sizing, returns and the drawdown percent are over `capital` in
-    every year (a year can start below zero, where a percent of the peak is meaningless)."""
+    every year (a year can start below zero)."""
     years = pd.to_datetime(equity["session_date"]).dt.year
     rows, start = {}, capital
     base = capital if fixed_capital else None
     for year, sub in equity.groupby(years, sort=True):
-        m = equity_metrics(sub, start, base)
-        if fixed_capital:
-            m["max_drawdown_pct"] = m["max_drawdown_rs"] / capital * 100
-        rows[year] = m
+        rows[year] = equity_metrics(sub, start, base)
         start = float(sub["equity"].iloc[-1])
     return pd.DataFrame.from_dict(rows, orient="index")
