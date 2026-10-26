@@ -98,9 +98,34 @@ def test_cli_end_to_end_writes_outputs_and_one_trial(paths, toy, capsys):
 
 
 def test_cli_unknown_strategy(paths, capsys):
-    assert main(["--strategy", "orb"], paths) == 2
-    assert "unknown strategy 'orb'" in capsys.readouterr().err
+    assert main(["--strategy", "nope"], paths) == 2
+    assert "unknown strategy 'nope'" in capsys.readouterr().err
     assert not paths.trials.exists()
+
+
+@pytest.mark.parametrize(
+    ("params", "match"),
+    [
+        ('{"filters": {"nifty_direction": {"enabled": true}}}', "not implemented"),
+        ('{"bogus": 1}', "bogus"),
+        ("{not json", "error"),
+    ],
+)
+def test_cli_rejects_bad_strategy_params(paths, capsys, params, match):
+    assert main(["--strategy", "orb", "--params", params], paths) == 2
+    assert match in capsys.readouterr().err
+    assert not paths.trials.exists()
+
+
+def test_cli_orb_logs_yaml_params_with_overrides(paths):
+    params = '{"target_r": 3.0, "filters": {"gap": {"enabled": false}}}'
+    argv = ["--strategy", "orb", "--symbols", "AAA,BBB", "--params", params]
+    assert main(argv, paths) == 0
+    (trial,) = read_trials(paths.trials)
+    p = trial["params"]
+    assert p["target_r"] == 3.0 and p["buffer_pct"] == 0.05 and p["stop"] == "full"
+    assert p["filters"]["gap"] == {"enabled": False, "max_abs_pct": 0.8}
+    assert trial["strategy"] == "orb" and trial["strategy_version"] == "1"
 
 
 def test_cli_holdout_needs_the_flag(paths, toy, capsys):
@@ -141,6 +166,14 @@ def test_zero_preset_is_labelled_reference_tier(paths, toy):
         paths=paths,
     )
     assert rec["reference_tier"] is True
+
+
+def test_zero_slippage_is_labelled_reference_tier(paths, toy, capsys):
+    argv = ["--strategy", "toy", "--symbols", "AAA,BBB", "--cost-tier", "none"]
+    assert main(argv, paths) == 0
+    (trial,) = read_trials(paths.trials)
+    assert trial["reference_tier"] is True and trial["brokerage_preset"] == "shoonya"
+    assert "REFERENCE TIER" in capsys.readouterr().out
 
 
 def test_git_state_reads_this_repo():

@@ -45,7 +45,10 @@ brokerage:
       dp_charge_per_scrip_rupees: 12.50
 
 # Slippage tiers, basis points per side, applied to fill prices by the simulator.
+# `none` is for the statutory-only reference tier (with the `zero` preset); any run with
+# zero slippage is logged as reference_tier: true.
 slippage_bps_per_side:
+  none: 0
   base: 3
   stress1: 6
   stress2: 10

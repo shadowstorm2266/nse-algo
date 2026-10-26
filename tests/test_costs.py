@@ -104,7 +104,12 @@ def test_non_positive_values_rejected(cfg, buy, sell):
 
 def test_config_presets_and_slippage(cfg):
     assert set(cfg.brokerage_presets) == {"zero", "shoonya", "dhan"}
-    assert cfg.slippage_bps_per_side == {"base": D(3), "stress1": D(6), "stress2": D(10)}
+    assert cfg.slippage_bps_per_side == {
+        "none": D(0),
+        "base": D(3),
+        "stress1": D(6),
+        "stress2": D(10),
+    }
 
 
 values = st.decimals(min_value=D("1"), max_value=D("10000000"), places=2)

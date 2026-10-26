@@ -1,0 +1,33 @@
+# Strategy 1: 30-minute Opening Range Breakout (intraday MIS).
+# Every parameter lives here; the code has no defaults. Changing a default here is a new
+# strategy version: bump OrbStrategy.version in src/nsealgo/strategies/orb.py.
+# Percentages are in percent (0.05 means 0.05%). Times are IST.
+# Entry window (09:45-14:00), flat_by (14:50), max_trades_per_day and sizing belong to
+# config/risk.yaml and are enforced by the RiskGovernor, not here.
+
+timeframe: 5m
+range_minutes: 30      # opening range = bars starting 09:15 .. 09:40; ORH/ORL known at 09:45
+buffer_pct: 0.05       # long stop-entry at ORH x (1 + buffer), short at ORL x (1 - buffer)
+stop: full             # full: ORL for longs, ORH for shorts; mid: the range midpoint
+target_r: 2.0          # target = trigger + target_r x (trigger - stop), mirrored for shorts
+time_exit: "14:30"     # market exit for open positions; the RiskGovernor flattens at flat_by
+# Candidates at 09:45 are ranked by (ORH - ORL) / ATR14 (ATR from prior sessions only).
+# The RiskGovernor takes OCO groups in rank order; groups beyond max_trades_per_day are
+# rejected with MAX_TRADES_PER_DAY and logged in rejections.parquet (the skip log).
+rank_order: narrowest_first   # or widest_first
+
+filters:
+  range_width:           # (ORH - ORL) / the 09:15 open, inclusive bounds
+    enabled: true
+    min_pct: 0.25
+    max_pct: 2.5
+  gap:                   # |09:15 open / previous session close - 1|
+    enabled: true
+    max_abs_pct: 0.8
+  prev_day_confluence:   # long leg only if its trigger is above the previous day's high,
+    enabled: false       # short leg only if its trigger is below the previous day's low
+  nifty_direction:       # not implemented: data/clean has no NIFTY 50 index bars
+    enabled: false
+  day_of_week:           # skip sessions on these weekdays (0 = Monday .. 4 = Friday)
+    enabled: false
+    skip_weekdays: []

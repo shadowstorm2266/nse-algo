@@ -1,9 +1,11 @@
-"""Risk and margin settings, read from config/risk.yaml and config/margins.yaml."""
+"""Risk and margin settings (config/risk.yaml, config/margins.yaml) and strategy
+parameters (config/strategies/<name>.yaml)."""
 
+from collections.abc import Mapping
 from datetime import time
 from decimal import Decimal
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -12,6 +14,7 @@ from nsealgo.settings import REPO_ROOT, Mode
 
 RISK_CONFIG_PATH = REPO_ROOT / "config" / "risk.yaml"
 MARGIN_CONFIG_PATH = REPO_ROOT / "config" / "margins.yaml"
+STRATEGY_CONFIG_DIR = REPO_ROOT / "config" / "strategies"
 
 HaltMode = Literal["record", "latch"]
 
@@ -101,3 +104,24 @@ def load_risk_config(path: Path = RISK_CONFIG_PATH) -> RiskConfig:
 
 def load_margin_config(path: Path = MARGIN_CONFIG_PATH) -> MarginConfig:
     return MarginConfig.model_validate(_read_yaml(path))
+
+
+def merge_params(base: Mapping[str, Any], overrides: Mapping[str, Any]) -> dict[str, Any]:
+    """`base` with `overrides` applied key by key; nested mappings merge recursively."""
+    out = dict(base)
+    for key, value in overrides.items():
+        if isinstance(value, Mapping) and isinstance(out.get(key), Mapping):
+            out[key] = merge_params(out[key], value)
+        else:
+            out[key] = value
+    return out
+
+
+def load_strategy_params(
+    name: str, overrides: Mapping[str, Any], config_dir: Path = STRATEGY_CONFIG_DIR
+) -> dict[str, Any]:
+    """config/strategies/<name>.yaml (empty if absent) with `overrides` merged in.
+    Strategies validate their own parameters and reject unknown keys."""
+    path = config_dir / f"{name}.yaml"
+    base = (_read_yaml(path) or {}) if path.is_file() else {}
+    return merge_params(base, overrides)

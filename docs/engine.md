@@ -9,6 +9,7 @@ and live mode; only the broker and the bar source differ.
 | Module | Role |
 |---|---|
 | `strategies/base.py` | `Strategy` protocol: `on_bar(ctx) -> list[OrderIntent]`, pure |
+| `strategies/orb.py` | Strategy 1, 30-minute Opening Range Breakout (`config/strategies/orb.yaml`) |
 | `engine/context.py` | `StrategyContext`: only what is visible at `now` |
 | `engine/risk.py` | `RiskGovernor`: the only code that turns intents into orders |
 | `engine/sizing.py`, `engine/exposure.py` | pure qty and exposure arithmetic for the RiskGovernor |
@@ -17,6 +18,14 @@ and live mode; only the broker and the bar source differ.
 | `engine/backtest.py` | the event loop |
 | `engine/loader.py` | DuckDB inputs, research periods, holdout lock |
 | `reporting/metrics.py`, `reporting/trials.py` | metrics and the trial log |
+
+## Strategy parameters
+
+Every parameter of a strategy lives in `config/strategies/<name>.yaml`; strategy code
+has no defaults and rejects unknown keys. `--params` is a JSON object merged over the
+YAML (nested keys merge), e.g.
+`--params '{"filters": {"gap": {"enabled": false}}}'`. The merged parameters go into
+the trial record. Changing a YAML default is a new strategy version.
 
 ## Timing (no look-ahead)
 
@@ -132,8 +141,12 @@ saved to `rejections.parquet`.
 
 Every run appends one line to `research/trials.jsonl` (append-only; the DSR trial
 count). The line holds the git hash and dirty flag, strategy and version, params,
-period, cost tier, slippage, brokerage preset, universe, metrics and the run dir. The
-`zero` brokerage preset is flagged `reference_tier: true`.
+period, cost tier, slippage, brokerage preset, universe, metrics and the run dir. A run
+with the `zero` brokerage preset or the `none` (0 bps) slippage tier is flagged
+`reference_tier: true`: a labelled reference, never a tradeable result.
+
+`scripts/report_runs.py` prints markdown tables from run directories (`summary` for
+one row per run, `detail` for one run by year, side, exit reason and symbol).
 
 ## Metrics
 

@@ -23,8 +23,10 @@ from nsealgo.engine.backtest import Backtester, BacktestResult
 from nsealgo.engine.config import (
     MARGIN_CONFIG_PATH,
     RISK_CONFIG_PATH,
+    STRATEGY_CONFIG_DIR,
     load_margin_config,
     load_risk_config,
+    load_strategy_params,
 )
 from nsealgo.engine.loader import (
     RESEARCH_CONFIG_PATH,
@@ -58,6 +60,7 @@ class RunPaths:
     costs: Path = COSTS_PATH
     research: Path = RESEARCH_CONFIG_PATH
     universe: Path = UNIVERSE_PATH
+    strategies: Path = STRATEGY_CONFIG_DIR
 
 
 def _simulate(
@@ -156,7 +159,8 @@ def _trial_record(
         "cost_tier": cost_tier,
         "slippage_bps_per_side": slippage_bps,
         "brokerage_preset": preset,
-        "reference_tier": preset == "zero",  # statutory charges only: a labelled reference
+        # No broker charges or no slippage: a labelled reference, never a tradeable result.
+        "reference_tier": preset == "zero" or slippage_bps == 0,
         "universe": universe,
         "capital": capital,
         "metrics": metrics,
@@ -215,7 +219,11 @@ def _parser() -> argparse.ArgumentParser:
     p.add_argument("--strategy", required=True)
     p.add_argument("--period", default="dev", choices=["dev", "validation", "holdout"])
     p.add_argument("--cost-tier", default="base")
-    p.add_argument("--params", default="{}", help="JSON object of strategy parameters")
+    p.add_argument(
+        "--params",
+        default="{}",
+        help="JSON object merged over config/strategies/<strategy>.yaml (nested keys merge)",
+    )
     p.add_argument("--symbols", default=None, help="comma-separated; default config/universe.yaml")
     p.add_argument("--brokerage", default=None, help="brokerage preset; default costs.yaml active")
     p.add_argument("--run-holdout", action="store_true", help="human-only: run the holdout once")
@@ -224,10 +232,15 @@ def _parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None, paths: RunPaths | None = None) -> int:
     args = _parser().parse_args(argv)
+    paths = paths or RunPaths()
     try:
-        strategy = make_strategy(args.strategy, json.loads(args.params))
+        params = load_strategy_params(args.strategy, json.loads(args.params), paths.strategies)
+        strategy = make_strategy(args.strategy, params)
     except KeyError as e:
         print(f"error: {e.args[0]}", file=sys.stderr)
+        return 2
+    except ValueError as e:  # bad JSON or parameters the strategy rejects
+        print(f"error: {e}", file=sys.stderr)
         return 2
     symbols = args.symbols.split(",") if args.symbols else None
     try:
@@ -254,6 +267,8 @@ def main(argv: list[str] | None = None, paths: RunPaths | None = None) -> int:
         "cost_share_of_gross",
     ]
     print(json.dumps({k: m.get(k) for k in keys}, indent=2))
+    if record["reference_tier"]:
+        print("REFERENCE TIER: no broker charges and/or no slippage; not a tradeable result")
     print(f"outputs: {record['run_dir']}")
     return 0
 
