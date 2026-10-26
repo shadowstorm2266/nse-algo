@@ -41,8 +41,11 @@ def test_yearly_equity_starts_each_year_from_the_last_close():
             "equity": [20_100.0, 19_900.0, 20_895.0],
         }
     )
-    y = yearly_equity(eq, 20_000.0)
+    y = yearly_equity(eq, 20_000.0, fixed_capital=False)
     assert y.loc[2016, "total_return_pct"] == pytest.approx(-0.5)
     assert y.loc[2016, "max_drawdown_rs"] == pytest.approx(200.0)
     assert y.loc[2017, "total_return_pct"] == pytest.approx(5.0)  # from 19,900
     assert y.loc[2017, "sessions"] == 1
+    fixed = yearly_equity(eq, 20_000.0, fixed_capital=True)
+    assert fixed.loc[2017, "total_return_pct"] == pytest.approx(4.975)  # 995 over 20,000
+    assert fixed.loc[2016, "total_return_pct"] == pytest.approx(-0.5)

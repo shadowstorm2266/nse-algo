@@ -10,6 +10,10 @@ halt_mode:                 # what the drawdown halt does, per run mode
   backtest: record         # keep trading; metrics report halt_would_fire_date / _drawdown_pct
   paper: latch             # no new entries for the rest of the run (must be latch)
   live: latch              # must be latch
+sizing_basis:              # which equity the RiskGovernor sizes from, per run mode
+  backtest: fixed_capital  # every session sizes off `capital`, no compounding (research)
+  paper: current_equity    # the account as it stands (must be current_equity)
+  live: current_equity     # must be current_equity
 live_enabled: false        # human-only switch
 
 # --- intraday (MIS) ---
@@ -28,6 +32,6 @@ max_positions_per_symbol: 1
 swing:
   enabled: true
   max_positions: 4
-  max_position_pct: 30          # of current equity, per position
-  max_gross_exposure_pct: 100   # of current equity; CNC is cash-only, no leverage
+  max_position_pct: 30          # of sizing equity (see sizing_basis), per position
+  max_gross_exposure_pct: 100   # of sizing equity; CNC is cash-only, no leverage
   max_orders_per_day: 8         # a rebalance day: 4 sells + 4 buys

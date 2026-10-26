@@ -163,6 +163,7 @@ def _trial_record(
         "reference_tier": preset == "zero" or slippage_bps == 0,
         "universe": universe,
         "capital": capital,
+        "sizing_basis": metrics["sizing_basis"],
         "metrics": metrics,
         "run_dir": str(run_dir),
     }
@@ -202,6 +203,7 @@ def run_backtest(
         halt=result.halt,
         rejections=result.rejections,
         fallback_exits=result.fallback_exits,
+        sizing_basis=bt.portfolio.sizing,
     )
     run_at = datetime.now(IST)
     run_dir = paths.runs_dir / f"{run_at:%Y%m%d-%H%M%S}_{strategy.name}_{period.label}_{cost_tier}"

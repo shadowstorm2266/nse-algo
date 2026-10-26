@@ -7,7 +7,7 @@ themselves are applied only in engine/risk.py.
 from decimal import Decimal
 
 from nsealgo.brokers.fills import dec
-from nsealgo.engine.config import MarginConfig
+from nsealgo.engine.config import MarginConfig, SizingBasis
 from nsealgo.engine.portfolio import AccountSnapshot
 from nsealgo.engine.types import ExitReason, OrderIntent, OrderRole, OrderType, Product
 
@@ -20,6 +20,19 @@ def reference_price(intent: OrderIntent, snap: AccountSnapshot) -> Decimal | Non
         return dec(intent.price)
     mark = snap.marks.get(intent.symbol)
     return dec(mark) if mark is not None and mark > 0 else None
+
+
+def sizing_shift(
+    snap: AccountSnapshot, capital: Decimal, basis: SizingBasis, product: Product
+) -> Decimal:
+    """What to add to equity and free cash so sizing sees `capital` instead of the
+    compounded account (`fixed_capital`; zero for `current_equity`). MIS: capital at the
+    session open plus the session's P&L so far. CNC decides after the close for the next
+    open: capital exactly (the next session opens at today's closing equity)."""
+    if basis == "current_equity":
+        return ZERO
+    anchor = snap.equity_at_session_start if product is Product.MIS else snap.equity
+    return capital - anchor
 
 
 def fully_exiting(snap: AccountSnapshot) -> set[str]:

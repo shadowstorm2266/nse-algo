@@ -19,12 +19,14 @@ def entry_year(trades: pd.DataFrame) -> pd.Series:
     return pd.to_datetime(trades["entry_time"]).dt.year.rename("year")
 
 
-def yearly_equity(equity: pd.DataFrame, capital: float) -> pd.DataFrame:
+def yearly_equity(equity: pd.DataFrame, capital: float, fixed_capital: bool) -> pd.DataFrame:
     """`equity_metrics` per calendar year. Each year starts from the previous year's last
-    session-end equity (the first from `capital`), so returns and drawdowns are in-year."""
+    session-end equity (the first from `capital`), so returns and drawdowns are in-year.
+    With fixed-capital sizing, returns are over `capital` in every year."""
     years = pd.to_datetime(equity["session_date"]).dt.year
     rows, start = {}, capital
+    base = capital if fixed_capital else None
     for year, sub in equity.groupby(years, sort=True):
-        rows[year] = equity_metrics(sub, start)
+        rows[year] = equity_metrics(sub, start, base)
         start = float(sub["equity"].iloc[-1])
     return pd.DataFrame.from_dict(rows, orient="index")

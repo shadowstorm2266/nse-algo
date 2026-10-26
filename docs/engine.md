@@ -80,7 +80,7 @@ plus working entry units), `POSITION_EXISTS`, `INVALID_STOP`, `NO_PRICE`,
 `QTY_BELOW_ONE`.
 
 - qty = min(floor(risk_per_trade / |ref - stop|), floor(remaining exposure / ref),
-  floor(free margin / (ref x margin%))).
+  floor(free margin / (ref x margin%))). Free margin is on the sizing basis (below).
 - `ref` is the trigger or limit price for STOP/LIMIT entries and the last visible
   close for market entries.
 - Margin % comes from `config/margins.yaml` (default 25%).
@@ -103,12 +103,23 @@ no entry window, no flat_by, no per-trade rupee risk and no daily loss stop.
   `NO_NEXT_SESSION`, `NO_PRICE`, sizing.
 - Sizing: slot = (equity - estimated buy charges) / max_positions, then qty =
   min(slot, 30% of equity, gross left under 100% of equity) / price in whole shares.
+  "Equity" here is the sizing equity (see the sizing basis below).
 - If the slot buys no share but one share fits the caps, the qty is 1. If one share
   is above 30% of equity, the stock is skipped (`PRICE_ABOVE_POSITION_CAP`, logged with
   price and rank) and review continues with the next rank.
 - Intents are reviewed exits first, then entries by `rank`. A position with a
   working full exit frees its slot.
 - Orders skip no_trade sessions: they fill at the next tradeable open.
+
+**Sizing basis** (`sizing_basis` in `risk.yaml`, per run mode). `current_equity` sizes
+from the account as it stands, so sizes compound; paper and live must use it.
+`fixed_capital` (the backtest default) sizes every session off `capital`, so a
+drawdown never shrinks later trades and every year of a research period is tested at
+the configured size. MIS: free margin is computed on the account rebased to `capital`
+at the session open, so the session's own P&L still counts. CNC: decisions after the
+close size off `capital` exactly, and the broker's cash check at the next open uses
+the same rebased account (`Portfolio.buying_power`). Equity, the drawdown halt, the
+daily loss limit and every trade record use the real, cumulative account.
 
 **Exits** reducing a real position are always allowed (`NO_POSITION`,
 `DUPLICATE_EXIT` and `INVALID_INTENT` otherwise), even under KILL or a latched halt.
@@ -161,7 +172,10 @@ Per round trip (partial exits summed):
 From session-end equity:
 
 - max drawdown in rupees and percent;
-- Sharpe = mean / std (ddof 1) of daily returns x sqrt(252), every session counted.
+- Sharpe = mean / std (ddof 1) of daily returns x sqrt(252), every session counted. A
+  daily return is the session's P&L over the previous session-end equity
+  (`current_equity`) or over capital (`fixed_capital`, where equity can go below zero).
+- `sizing_basis` is recorded in `metrics.json` and in the trial record.
 
 ## Holdout lock
 

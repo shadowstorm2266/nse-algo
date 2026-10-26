@@ -1,10 +1,9 @@
 """RiskGovernor: the only code that turns strategy intents into orders.
 
-Limits come from config/risk.yaml. An MIS run uses the intraday rules, a CNC run the
-swing block. Exits that reduce a real position are always allowed (even under KILL
-or a latched halt). Every rejection carries a reason code and is logged on
-`nsealgo.risk`. The same class runs in backtest, paper and live: it reads only the
-snapshot, the calendar, the config, and (if given) the KILL file.
+Limits come from config/risk.yaml (MIS: intraday rules; CNC: the swing block; sizing
+basis per run mode). Exits reducing a real position are always allowed, even under KILL
+or a latched halt. Every rejection has a reason code, logged on `nsealgo.risk`. Runs in
+backtest, paper and live alike: reads only the snapshot, calendar, config and KILL file.
 """
 
 import logging
@@ -22,6 +21,7 @@ from nsealgo.engine.config import MarginConfig, RiskConfig
 from nsealgo.engine.exposure import (
     committed,
     reference_price,
+    sizing_shift,
     strategy_orders_today,
     swing_slots_and_gross,
     trades_today,
@@ -70,6 +70,7 @@ class RiskGovernor:
         self._delivery = costs.brokerage_presets[brokerage_preset].delivery
         self.product = product
         self.halt_mode = config.halt_mode.for_mode(mode)
+        self.sizing_basis = config.sizing_basis.for_mode(mode)
         self.kill_file = kill_file
         self.halt: HaltRecord | None = None
         self.latched = False
@@ -191,12 +192,13 @@ class RiskGovernor:
         if target is not None and ((long and target <= ref) or (not long and target >= ref)):
             return self._reject(intent, now, R.INVALID_INTENT, f"target {target} vs ref {ref}", ref)
         exposure, margin = committed(snap, self.margins, exclude_group=intent.group_id)
+        shift = sizing_shift(snap, self.config.capital, self.sizing_basis, self.product)
         q = mis_qty(
             risk_rupees=self.config.risk_per_trade_rupees,
             ref=ref,
             stop=stop,
             remaining_exposure=self.config.max_gross_exposure_rupees - exposure,
-            free_margin=snap.free_cash - margin,
+            free_margin=snap.free_cash + shift - margin,
             margin_fraction=self.margins.mis_fraction(intent.symbol),
         )
         if q.qty < 1:
@@ -304,7 +306,8 @@ class RiskGovernor:
         return None
 
     def _swing_size(self, snap: AccountSnapshot, price: Decimal) -> SwingSize:
-        sw, equity = self.config.swing, snap.equity
+        shift = sizing_shift(snap, self.config.capital, self.sizing_basis, self.product)
+        sw, equity = self.config.swing, snap.equity + shift
         per_slot = equity / sw.max_positions
         est = ZERO
         if per_slot > 0:

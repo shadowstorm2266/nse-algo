@@ -126,6 +126,7 @@ def test_cli_orb_logs_yaml_params_with_overrides(paths):
     assert p["target_r"] == 3.0 and p["buffer_pct"] == 0.05 and p["stop"] == "full"
     assert p["filters"]["gap"] == {"enabled": False, "max_abs_pct": 0.8}
     assert trial["strategy"] == "orb" and trial["strategy_version"] == "1"
+    assert trial["sizing_basis"] == trial["metrics"]["sizing_basis"] == "fixed_capital"
 
 
 def test_cli_holdout_needs_the_flag(paths, toy, capsys):

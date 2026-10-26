@@ -5,8 +5,12 @@ Definitions (per round trip; partial exits of one trade are summed first):
 - bps figures are means over trades of P&L / entry notional x 10,000.
 - profit factor = sum of net wins / |sum of net losses| (None with no losses).
 - cost share of gross = (charges + slippage) / gross P&L (None if gross <= 0).
-- Sharpe = mean / std (ddof=1) of daily equity returns x sqrt(252), every session
-  counted, returns from the starting capital; max drawdown from session-end equity.
+- Sharpe = mean / std (ddof=1) of daily returns x sqrt(252), every session counted.
+  A daily return is the session's P&L over the previous session-end equity
+  (`current_equity` sizing, compounding) or over capital (`fixed_capital` sizing, where
+  sizes do not compound and equity may go below zero).
+- Max drawdown from session-end equity: peak minus equity, in rupees and as a percent
+  of the running peak (the peak starts at capital).
 """
 
 import math
@@ -71,7 +75,11 @@ def trade_metrics(trades: pd.DataFrame) -> dict[str, Any]:
     }
 
 
-def equity_metrics(equity: pd.DataFrame, capital: float) -> dict[str, Any]:
+def equity_metrics(
+    equity: pd.DataFrame, capital: float, return_base: float | None = None
+) -> dict[str, Any]:
+    """`capital` is the equity before the first row. Returns are P&L over the previous
+    equity, or over `return_base` when given (fixed-capital sizing)."""
     if equity.empty:
         return {
             "sessions": 0,
@@ -83,14 +91,15 @@ def equity_metrics(equity: pd.DataFrame, capital: float) -> dict[str, Any]:
         }
     eq = equity["equity"].astype(float).to_numpy()
     path = np.r_[capital, eq]
-    rets = path[1:] / path[:-1] - 1
+    pnl = np.diff(path)
+    rets = pnl / return_base if return_base else pnl / path[:-1]
     peak = np.maximum.accumulate(path)
     dd = peak - path
     sd = rets.std(ddof=1) if len(rets) > 1 else 0.0
     return {
         "sessions": len(eq),
         "final_equity": float(eq[-1]),
-        "total_return_pct": float((eq[-1] / capital - 1) * 100),
+        "total_return_pct": float((eq[-1] - capital) / (return_base or capital) * 100),
         "max_drawdown_rs": float(dd.max()),
         "max_drawdown_pct": float((dd / peak).max() * 100),
         "sharpe_daily_annualized": float(rets.mean() / sd * math.sqrt(TRADING_DAYS))
@@ -107,8 +116,11 @@ def compute_metrics(
     halt: HaltRecord | None = None,
     rejections: pd.DataFrame | None = None,
     fallback_exits: int = 0,
+    sizing_basis: str = "current_equity",
 ) -> dict[str, Any]:
-    out = trade_metrics(trades) | equity_metrics(equity, capital)
+    base = capital if sizing_basis == "fixed_capital" else None
+    out = trade_metrics(trades) | equity_metrics(equity, capital, base)
+    out["sizing_basis"] = sizing_basis
     out["halt_would_fire_date"] = halt.date.isoformat() if halt else None
     out["halt_would_fire_drawdown_pct"] = halt.drawdown_pct if halt else None
     out["fallback_exits"] = fallback_exits

@@ -35,6 +35,7 @@ TRADE_COLS: list[Col] = [
 ]
 SUMMARY_COLS: list[Col] = [
     ("Ref tier", "reference_tier", "flag"),
+    ("Sizing", "sizing_basis", "text"),
     *TRADE_COLS[:-1],
     ("Max DD Rs", "max_drawdown_rs", "rs"),
     ("Max DD %", "max_drawdown_pct", "pct100"),
@@ -52,6 +53,8 @@ YEAR_COLS: list[Col] = [
 def fmt(v: Any, kind: str) -> str:
     if v is None or (isinstance(v, float) and math.isnan(v)):
         return "-"
+    if kind == "text":
+        return str(v)
     if kind == "flag":
         return "REFERENCE" if v else ""
     formats = {
@@ -90,20 +93,26 @@ def summary(specs: list[str]) -> str:
         m = json.loads((run_dir / "metrics.json").read_text(encoding="utf-8"))
         trial = trial_for(run_dir)
         skipped = m["rejections_by_reason"].get("MAX_TRADES_PER_DAY", 0)
-        rows[label] = m | {"reference_tier": trial["reference_tier"], "skipped_groups": skipped}
+        extra = {"reference_tier": trial["reference_tier"], "skipped_groups": skipped}
+        rows[label] = m | extra | {"sizing_basis": trial.get("sizing_basis", "current_equity")}
     return md_table(pd.DataFrame.from_dict(rows, orient="index"), SUMMARY_COLS, "Run")
 
 
 def detail(run_dir: Path, top: int, sort: str) -> str:
     trial = trial_for(run_dir)
+    # Trials logged before the sizing basis existed sized off current equity.
+    fixed = trial.get("sizing_basis", "current_equity") == "fixed_capital"
     trades = pd.read_parquet(run_dir / "trades.parquet")
     equity = pd.read_parquet(run_dir / "equity.parquet")
     years = breakdown(trades, entry_year(trades)).join(
-        yearly_equity(equity, trial["capital"])[["max_drawdown_pct", "sharpe_daily_annualized"]]
+        yearly_equity(equity, trial["capital"], fixed)[
+            ["max_drawdown_pct", "sharpe_daily_annualized"]
+        ]
     )
     symbols = breakdown(trades, "symbol").sort_values(sort, ascending=False)
     parts = [
-        f"run: {run_dir.name} (tier {trial['cost_tier']}, {trial['brokerage_preset']})",
+        f"run: {run_dir.name} (tier {trial['cost_tier']}, {trial['brokerage_preset']}, "
+        f"sizing {'fixed_capital' if fixed else 'current_equity'})",
         "By year (entry year; Max DD % and Sharpe from that year's sessions)",
         md_table(years, YEAR_COLS, "Year"),
         "By side",

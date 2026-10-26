@@ -8,7 +8,8 @@
    fills, siblings are cancelled), then bracket children (stop before target).
 Every fill pays `costs.fill_charges` plus slippage. The DP charge applies to the
 first CNC sell of a scrip in each session. A CNC buy that free cash cannot cover is
-rejected (INSUFFICIENT_CASH), as a real broker would.
+rejected (INSUFFICIENT_CASH), as a real broker would; "cash" is the funds view's
+buying power (see Portfolio.buying_power for the research sizing basis).
 """
 
 import logging
@@ -44,7 +45,7 @@ WORKING = OrderStatus.WORKING
 
 
 class FundsView(Protocol):
-    def free_cash(self) -> Decimal: ...
+    def buying_power(self) -> Decimal: ...
 
 
 @dataclass
@@ -231,7 +232,7 @@ class SimBroker:
         price = slip(ref, o.side, self._bps)
         charges = self._charges(o, price * o.qty, bar.session_date)
         if o.product is Product.CNC and o.side is Side.BUY:
-            need, have = price * o.qty + charges.total, self._funds.free_cash()
+            need, have = price * o.qty + charges.total, self._funds.buying_power()
             if need > have:
                 self._finish(
                     st, OrderStatus.REJECTED, f"INSUFFICIENT_CASH: need {need:.2f}, free {have:.2f}"

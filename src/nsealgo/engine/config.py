@@ -33,6 +33,24 @@ class HaltModes(BaseModel):
         return getattr(self, mode)
 
 
+SizingBasis = Literal["current_equity", "fixed_capital"]
+
+
+class SizingBases(BaseModel):
+    """Which equity the RiskGovernor sizes from. `current_equity`: the account as it
+    stands (compounding). `fixed_capital`: every session sizes off `capital`, no
+    compounding; research only. Paper and live must use current equity."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    backtest: SizingBasis
+    paper: Literal["current_equity"]
+    live: Literal["current_equity"]
+
+    def for_mode(self, mode: Mode) -> SizingBasis:
+        return getattr(self, mode)
+
+
 class SwingConfig(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
@@ -49,6 +67,7 @@ class RiskConfig(BaseModel):
     capital: Decimal = Field(gt=0)
     account_drawdown_halt_pct: Decimal = Field(gt=0, lt=100)
     halt_mode: HaltModes
+    sizing_basis: SizingBases
     live_enabled: bool
     risk_per_trade_rupees: Decimal = Field(gt=0)
     max_trades_per_day: int = Field(gt=0)

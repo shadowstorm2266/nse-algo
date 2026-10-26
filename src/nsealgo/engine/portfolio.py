@@ -3,7 +3,10 @@
 `ledger` is capital plus realized P&L at fill prices minus every charge paid.
 Equity = ledger + unrealized. Margin used is MIS |qty| x entry price x the symbol's
 margin fraction plus CNC qty x entry price (cash only). Free cash = ledger + any
-unrealized loss (gains are not spendable) - margin used.
+unrealized loss (gains are not spendable) - margin used. With the `fixed_capital`
+sizing basis (research), `buying_power` - the cash the broker lets a CNC buy use - is
+on an account rebased to `capital` at each session open; equity, ledger and every
+trade record stay the real, cumulative account.
 """
 
 from collections.abc import Mapping
@@ -16,7 +19,7 @@ from typing import Any
 import pandas as pd
 
 from nsealgo.brokers.fills import dec
-from nsealgo.engine.config import MarginConfig
+from nsealgo.engine.config import MarginConfig, SizingBasis
 from nsealgo.engine.types import ExitReason, Fill, OrderRole, OrderStatus, OrderView, Product
 
 PAISA = Decimal("0.01")
@@ -105,8 +108,11 @@ class AccountSnapshot:
 
 
 class Portfolio:
-    def __init__(self, capital: Decimal, margins: MarginConfig) -> None:
+    def __init__(
+        self, capital: Decimal, margins: MarginConfig, sizing: SizingBasis = "current_equity"
+    ) -> None:
         self.capital = capital
+        self.sizing = sizing
         self.ledger = capital
         self.margins = margins
         self.positions: dict[str, Position] = {}
@@ -218,6 +224,12 @@ class Portfolio:
 
     def free_cash(self) -> Decimal:
         return self.ledger + min(ZERO, self.unrealized()) - self.margin_used()
+
+    def buying_power(self) -> Decimal:
+        """Free cash for the broker's CNC cash check, on the sizing basis."""
+        if self.sizing == "current_equity":
+            return self.free_cash()
+        return self.free_cash() + self.capital - self.equity_at_session_start
 
     def position_views(self) -> Mapping[str, PositionView]:
         return MappingProxyType(

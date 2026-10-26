@@ -93,7 +93,8 @@ class Backtester:
         self.strategy = strategy
         self.universe = tuple(universe)
         self.calendar = calendar
-        self.portfolio = Portfolio(risk_config.capital, margins)
+        sizing = risk_config.sizing_basis.for_mode(mode)
+        self.portfolio = Portfolio(risk_config.capital, margins, sizing)
         self.broker = SimBroker(
             costs,
             brokerage_preset,

@@ -35,7 +35,7 @@ DAYS = business_days("2024-01-01", 6)  # Mon 1 .. Mon 8 Jan
 NO_TRADE = DAYS[2]  # Wed 3 Jan
 
 
-def governor(**swing) -> RiskGovernor:
+def governor(mode: str = "backtest", **swing) -> RiskGovernor:
     return RiskGovernor(
         risk_config(swing=swing),
         margins(),
@@ -43,7 +43,7 @@ def governor(**swing) -> RiskGovernor:
         cost_config(),
         "shoonya",
         product=CNC,
-        mode="backtest",
+        mode=mode,
     )
 
 
@@ -72,9 +72,11 @@ def test_equal_weight_slot_after_estimated_buy_charges():
     assert order.expires_at == session_close(DAYS[1])
 
 
-def test_slot_uses_current_equity():
+def test_slot_uses_current_equity_in_paper_and_capital_in_backtests():
     # Buy charges on 6000 are 7.12, so the slot is (24000 - 4 x 7.12) / 4 = 5992.88.
-    assert review(governor(), buy(), equity="24000").qty == 59
+    assert review(governor(mode="paper"), buy(), equity="24000").qty == 59
+    # Backtests size off the fixed 20000 capital (sizing_basis.backtest: fixed_capital).
+    assert review(governor(), buy(), equity="24000").qty == 49
 
 
 def test_one_share_when_the_slot_buys_none_but_it_fits_the_cap():
