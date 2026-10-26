@@ -52,3 +52,4 @@ IMPORTANT: This code will eventually place real orders with real money. Correctn
 - Functions under 50 lines, files under 400 lines, type hints everywhere.
 - End every task with: what changed, which tests ran, what you are unsure about.
 - When a broker API detail is uncertain, read the broker's official docs or ask. Never guess endpoint or field names.
+- Git: commit straight to `main` unless the owner asks for a branch.
