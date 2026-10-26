@@ -2,6 +2,7 @@
 /data/
 /logs/
 /state/
+/research/runs/
 .env
 .env.*
 !.env.example

@@ -19,6 +19,8 @@ CRORE = Decimal(10_000_000)
 
 BrokerageKind = Literal["zero", "flat_or_pct", "flat"]
 Number = Decimal | int | float | str
+PRODUCTS = ("MIS", "CNC")
+SIDES = ("BUY", "SELL")
 
 
 def _dec(x: Number) -> Decimal:
@@ -157,6 +159,45 @@ def delivery_round_trip(
         turnover=buy + sell,
         stamp=_pct(buy, rates.delivery_stamp_buy_pct),
         dp_charge=_dec(dp_charge_per_scrip),
+        rates=rates,
+    )
+
+
+def fill_charges(
+    product: str,
+    side: str,
+    value: Number,
+    rates: StatutoryRates,
+    brokerage: BrokerageModel,
+    dp_charge: Number = 0,
+) -> CostBreakdown:
+    """Charges for one executed order (one leg) of `value` rupees.
+
+    `product` is "MIS" or "CNC", `side` is "BUY" or "SELL". `dp_charge` (before GST)
+    is only allowed on a CNC sell; the caller decides whether this sell is the first
+    of the scrip that day. Components are rounded to the paisa per order, so the two
+    legs of a round trip can differ by a few paise from the round-trip functions.
+    """
+    if product not in PRODUCTS or side not in SIDES:
+        raise ValueError(f"unknown product/side {product!r}/{side!r}")
+    v, dp = _dec(value), _dec(dp_charge)
+    if v <= 0:
+        raise ValueError(f"order value must be positive, got {v}")
+    if dp and not (product == "CNC" and side == "SELL"):
+        raise ValueError("DP charge applies only to CNC sells")
+    buy = side == "BUY"
+    if product == "MIS":
+        stt = Decimal(0) if buy else _pct(v, rates.intraday_stt_sell_pct)
+        stamp = _pct(v, rates.intraday_stamp_buy_pct) if buy else Decimal(0)
+    else:
+        stt = _pct(v, rates.delivery_stt_buy_pct if buy else rates.delivery_stt_sell_pct)
+        stamp = _pct(v, rates.delivery_stamp_buy_pct) if buy else Decimal(0)
+    return _build(
+        brokerage=brokerage.per_order(v),
+        stt=stt,
+        turnover=v,
+        stamp=stamp,
+        dp_charge=dp,
         rates=rates,
     )
 

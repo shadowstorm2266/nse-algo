@@ -9,6 +9,7 @@ from nsealgo.costs import (
     BrokerageModel,
     CostConfig,
     delivery_round_trip,
+    fill_charges,
     intraday_round_trip,
     load_cost_config,
 )
@@ -132,3 +133,64 @@ def test_delivery_statutory_exceeds_intraday(cfg, buy, sell):
         delivery_round_trip(buy, sell, cfg.rates, z, 0).total
         >= intraday_round_trip(buy, sell, cfg.rates, z).total
     )
+
+
+# --- per-fill charges (one order) ---
+
+
+def test_mis_buy_leg_known_answer(cfg):
+    # 20 x 500.15 = 10003.00. Brokerage min(5, 3.0009); txn 0.2970891; SEBI 0.010003;
+    # stamp 0.30009; GST 18% of 3.3079921 = 0.5954...
+    cb = fill_charges("MIS", "BUY", D("10003.00"), cfg.rates, cfg.broker.intraday)
+    assert (cb.brokerage, cb.stt, cb.transaction_charge) == (D("3.00"), D("0.00"), D("0.30"))
+    assert (cb.sebi_fee, cb.stamp_duty, cb.gst, cb.dp_charge) == (
+        D("0.01"),
+        D("0.30"),
+        D("0.60"),
+        0,
+    )
+    assert cb.total == D("4.21")
+
+
+def test_mis_sell_leg_known_answer(cfg):
+    # 20 x 509.847 = 10196.94. Brokerage 3.059082; STT 2.549235; txn 0.30285;
+    # SEBI 0.0102; GST 18% of 3.37212806 = 0.6070
+    cb = fill_charges("MIS", "SELL", D("10196.94"), cfg.rates, cfg.broker.intraday)
+    assert (cb.brokerage, cb.stt, cb.stamp_duty, cb.gst) == (D("3.06"), D("2.55"), 0, D("0.61"))
+    assert cb.total == D("6.53")
+
+
+def test_cnc_legs_and_dp_only_on_sell(cfg):
+    p = cfg.brokerage_presets["shoonya"]
+    buy = fill_charges("CNC", "BUY", 5_000, cfg.rates, p.delivery)
+    assert (buy.stt, buy.stamp_duty, buy.dp_charge) == (D("5.00"), D("0.75"), 0)
+    sell = fill_charges("CNC", "SELL", 5_000, cfg.rates, p.delivery, p.dp_charge_per_scrip)
+    assert (sell.stt, sell.stamp_duty, sell.dp_charge) == (D("5.00"), 0, D("9.00"))
+    assert sell.gst == D("1.65")  # 18% of (txn 0.1485 + SEBI 0.005 + DP 9) = 1.64763
+    with pytest.raises(ValueError):
+        fill_charges("CNC", "BUY", 5_000, cfg.rates, p.delivery, 9)
+    with pytest.raises(ValueError):
+        fill_charges("MIS", "SELL", 5_000, cfg.rates, p.intraday, 9)
+
+
+@pytest.mark.parametrize(("product", "side"), [("NRML", "BUY"), ("MIS", "HOLD")])
+def test_fill_charges_rejects_unknown_product_or_side(cfg, product, side):
+    with pytest.raises(ValueError):
+        fill_charges(product, side, 1_000, cfg.rates, cfg.broker.intraday)
+
+
+@given(buy=values, sell=values, preset=st.sampled_from(["zero", "shoonya", "dhan"]))
+def test_fill_legs_match_round_trip_within_rounding(cfg, buy, sell, preset):
+    # Seven components, each rounded once per leg instead of once per round trip.
+    p = cfg.brokerage_presets[preset]
+    mis = (
+        fill_charges("MIS", "BUY", buy, cfg.rates, p.intraday).total
+        + fill_charges("MIS", "SELL", sell, cfg.rates, p.intraday).total
+    )
+    assert abs(mis - intraday_round_trip(buy, sell, cfg.rates, p.intraday).total) <= D("0.07")
+    cnc = (
+        fill_charges("CNC", "BUY", buy, cfg.rates, p.delivery).total
+        + fill_charges("CNC", "SELL", sell, cfg.rates, p.delivery, p.dp_charge_per_scrip).total
+    )
+    rt = delivery_round_trip(buy, sell, cfg.rates, p.delivery, p.dp_charge_per_scrip).total
+    assert abs(cnc - rt) <= D("0.07")

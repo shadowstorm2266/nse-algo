@@ -1,6 +1,18 @@
 # Risk limits. Enforced only by src/nsealgo/engine/risk.py (RiskGovernor).
 # Change only on explicit human instruction.
+# Each backtest runs one strategy alone on its own capital: an MIS strategy uses the
+# intraday limits, a CNC strategy the swing block. They never combine.
+
+# --- shared ---
 capital: 20000
+account_drawdown_halt_pct: 15
+halt_mode:                 # what the drawdown halt does, per run mode
+  backtest: record         # keep trading; metrics report halt_would_fire_date / _drawdown_pct
+  paper: latch             # no new entries for the rest of the run (must be latch)
+  live: latch              # must be latch
+live_enabled: false        # human-only switch
+
+# --- intraday (MIS) ---
 risk_per_trade_rupees: 100
 max_trades_per_day: 2
 max_daily_loss_rupees: 300
@@ -9,5 +21,13 @@ entry_start: "09:45"   # IST
 entry_end: "14:00"     # IST
 flat_by: "14:50"       # IST, every MIS position flat
 max_positions_per_symbol: 1
-account_drawdown_halt_pct: 15
-live_enabled: false    # human-only switch
+
+# --- swing (CNC, daily bars) ---
+# Orders are only for the next session's open: no entry window, no flat_by.
+# Equal-weight sizing in whole shares; no per-trade rupee risk and no daily loss stop.
+swing:
+  enabled: true
+  max_positions: 4
+  max_position_pct: 30          # of current equity, per position
+  max_gross_exposure_pct: 100   # of current equity; CNC is cash-only, no leverage
+  max_orders_per_day: 8         # a rebalance day: 4 sells + 4 buys

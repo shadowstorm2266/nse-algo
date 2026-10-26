@@ -1,0 +1,5 @@
+# MIS margin as percent of order value (VaR + ELM), used by the RiskGovernor's
+# free-margin term. Add per-symbol values from the broker's margin file; symbols
+# not listed use the conservative default. CNC is always 100% (cash only).
+default_mis_margin_pct: 25
+symbols: {}
