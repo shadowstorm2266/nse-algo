@@ -49,3 +49,16 @@ def test_yearly_equity_starts_each_year_from_the_last_close():
     fixed = yearly_equity(eq, 20_000.0, fixed_capital=True)
     assert fixed.loc[2017, "total_return_pct"] == pytest.approx(4.975)  # 995 over 20,000
     assert fixed.loc[2016, "total_return_pct"] == pytest.approx(-0.5)
+
+
+def test_yearly_drawdown_over_capital_when_a_year_starts_below_zero():
+    eq = pd.DataFrame(
+        {
+            "session_date": [date(2016, 1, 4), date(2017, 1, 2), date(2017, 1, 3)],
+            "equity": [-1_000.0, -500.0, -3_500.0],
+        }
+    )
+    y = yearly_equity(eq, 20_000.0, fixed_capital=True)
+    assert y.loc[2016, "max_drawdown_pct"] == pytest.approx(105.0)  # 21,000 of 20,000
+    assert y.loc[2017, "max_drawdown_rs"] == pytest.approx(3_000.0)  # peak -500 to -3,500
+    assert y.loc[2017, "max_drawdown_pct"] == pytest.approx(15.0)
