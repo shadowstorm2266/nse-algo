@@ -16,7 +16,7 @@ from pathlib import Path
 import pandas as pd
 
 from nsealgo.brokers.fills import dec
-from nsealgo.costs import CostConfig, fill_charges
+from nsealgo.costs import CostConfig
 from nsealgo.engine.config import MarginConfig, RiskConfig
 from nsealgo.engine.exposure import (
     committed,
@@ -308,15 +308,12 @@ class RiskGovernor:
     def _swing_size(self, snap: AccountSnapshot, price: Decimal) -> SwingSize:
         shift = sizing_shift(snap, self.config.capital, self.sizing_basis, self.product)
         sw, equity = self.config.swing, snap.equity + shift
-        per_slot, est = equity / sw.max_positions, ZERO
-        if per_slot > 0:
-            leg = fill_charges("CNC", "BUY", per_slot, self._rates, self._delivery)
-            est = sw.max_positions * leg.total
         _, _, gross = swing_slots_and_gross(snap)
         return swing_qty(
             price=price,
             equity=equity,
-            est_buy_charges=est,
+            rates=self._rates,
+            delivery=self._delivery,
             max_positions=sw.max_positions,
             cash_buffer_pct=sw.cash_buffer_pct,
             position_cap=equity * sw.max_position_pct / 100,

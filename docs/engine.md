@@ -69,7 +69,10 @@ deliberately leaky engines (bars visible one bar early, fills visible early).
   distance 0); an exact tie goes to the leg submitted first.
 - Charges: `costs.fill_charges` per fill, each component rounded to the paisa per
   order. The DP charge applies to the first CNC sell of a scrip in each session.
-- A CNC buy that free cash cannot cover at the open is rejected (`INSUFFICIENT_CASH`).
+- A CNC buy that cash cannot cover at the open is rejected (`INSUFFICIENT_CASH`). Cash
+  (`Portfolio.cash`) is real cash: ledger minus margin used, less only unrealized losses
+  on MIS positions. Delivery holdings are paid for in full, so their unrealized losses
+  do not reduce it. MIS free margin (`free_cash`) still subtracts every unrealized loss.
 - Session end: MIS orders are cancelled. CNC orders whose fill session has passed
   expire. An MIS position still open (no bar at or after `flat_by` for that symbol)
   is closed at the last close (`session_end_fallback`, counted in metrics). At the
@@ -108,14 +111,18 @@ no entry window, no flat_by, no per-trade rupee risk and no daily loss stop.
 - Checks: `SWING_DISABLED`, `SHORT_NOT_ALLOWED`, `INVALID_INTENT` (any price, stop,
   target or group), `MAX_ORDERS_PER_DAY`, `POSITION_EXISTS`, `MAX_POSITIONS`,
   `NO_NEXT_SESSION`, `NO_PRICE`, sizing.
-- Sizing: slot = (equity - estimated buy charges) / max_positions, of which
-  (100 - `cash_buffer_pct`)% is spent (99%: the rest absorbs a normal opening gap plus
-  costs, so the buy is not rejected for cash). qty = min(that, 30% of equity, gross
-  left under 100% of equity) / price in whole shares; the buffer does not reduce the
-  caps. "Equity" here is the sizing equity (see the sizing basis below).
-- If the buffered slot buys no share but one share fits the caps, the qty is 1. If one share
-  is above 30% of equity, the stock is skipped (`PRICE_ABOVE_POSITION_CAP`, logged with
-  price and rank) and review continues with the next rank.
+- Sizing: slot = equity / max_positions, and room = gross left under 100% of equity
+  (held positions at marks and pending entries at their reference price; a full
+  working exit frees its position). Each is reduced by the estimated buy charges on
+  that amount, then (100 - `cash_buffer_pct`)% of it is spent (99%: the rest absorbs a
+  normal opening gap, slippage and same-morning sell charges, so the buy is not
+  rejected for cash). qty = min(slot, 30% of equity, room) / price in whole shares;
+  the buffer does not reduce the 30% position cap. "Equity" here is the sizing equity
+  (see the sizing basis below).
+- If the buffered slot buys no share but one share fits the position cap and the room,
+  the qty is 1. If one share is above 30% of equity, the stock is skipped
+  (`PRICE_ABOVE_POSITION_CAP`, logged with price and rank) and review continues with
+  the next rank.
 - Intents are reviewed exits first, then entries by `rank`. A position with a
   working full exit frees its slot.
 - Orders skip no_trade sessions: they fill at the next tradeable open.

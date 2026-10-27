@@ -2,11 +2,13 @@
 
 `ledger` is capital plus realized P&L at fill prices minus every charge paid.
 Equity = ledger + unrealized. Margin used is MIS |qty| x entry price x the symbol's
-margin fraction plus CNC qty x entry price (cash only). Free cash = ledger + any
-unrealized loss (gains are not spendable) - margin used. With the `fixed_capital`
-sizing basis (research), `buying_power` - the cash the broker lets a CNC buy use - is
-on an account rebased to `capital` at each session open; equity, ledger and every
-trade record stay the real, cumulative account.
+margin fraction plus CNC qty x entry price (cash only). Free cash (MIS free margin) =
+ledger + any unrealized loss (gains are not spendable) - margin used. Cash (what a CNC
+buy can use) = ledger - margin used + any unrealized loss on MIS positions: delivery
+holdings are paid for in full, so their unrealized P&L moves no cash. With the
+`fixed_capital` sizing basis (research), `buying_power` - the cash the broker lets a
+CNC buy use - is on an account rebased to `capital` at each session open; equity,
+ledger and every trade record stay the real, cumulative account.
 """
 
 from collections.abc import Mapping
@@ -207,8 +209,16 @@ class Portfolio:
         self.trades.append(trade)
         return trade
 
-    def unrealized(self) -> Decimal:
-        return sum(((self.marks[s] - p.avg_price) * p.qty for s, p in self.positions.items()), ZERO)
+    def unrealized(self, product: Product | None = None) -> Decimal:
+        """At marks; only `product`'s positions if given."""
+        return sum(
+            (
+                (self.marks[s] - p.avg_price) * p.qty
+                for s, p in self.positions.items()
+                if product is None or p.product is product
+            ),
+            ZERO,
+        )
 
     def _margin_fraction(self, p: Position) -> Decimal:
         return Decimal(1) if p.product is Product.CNC else self.margins.mis_fraction(p.symbol)
@@ -223,13 +233,18 @@ class Portfolio:
         return self.ledger + self.unrealized()
 
     def free_cash(self) -> Decimal:
+        """MIS free margin: any unrealized loss counts, CNC holdings' included."""
         return self.ledger + min(ZERO, self.unrealized()) - self.margin_used()
 
+    def cash(self) -> Decimal:
+        """Real cash: only MIS positions' unrealized losses reduce it."""
+        return self.ledger + min(ZERO, self.unrealized(Product.MIS)) - self.margin_used()
+
     def buying_power(self) -> Decimal:
-        """Free cash for the broker's CNC cash check, on the sizing basis."""
+        """Cash for the broker's CNC cash check, on the sizing basis."""
         if self.sizing == "current_equity":
-            return self.free_cash()
-        return self.free_cash() + self.capital - self.equity_at_session_start
+            return self.cash()
+        return self.cash() + self.capital - self.equity_at_session_start
 
     def position_views(self) -> Mapping[str, PositionView]:
         return MappingProxyType(

@@ -85,7 +85,7 @@ def test_cash_buffer_sizes_each_buy_at_99_pct_of_its_slot():
     # Slot (20000 - 23.76) / 4 = 4994.06; 99% of it is 4944.12.
     assert review(governor(), buy(), marks={"A": 50.0}).qty == 98  # floor(98.88)
     assert review(governor(cash_buffer_pct=0), buy(), marks={"A": 50.0}).qty == 99  # 99.88
-    # The caps are not reduced: one share still fits up to 30% of equity.
+    # The position cap is not reduced: one share still fits up to 30% of equity.
     assert review(governor(), buy(), marks={"A": 5990.0}).qty == 1
     for bad in (-1, 100):
         with pytest.raises(ValidationError):
@@ -108,6 +108,19 @@ def test_gross_cap_counts_held_and_pending():
     held = tuple(pos_view(s, 60, "100", product=CNC) for s in "BCD")  # 18000 of 20000
     r = review(governor(), buy(), marks={"A": 2500.0}, positions=held)
     assert reason(r) == RejectReason.QTY_BELOW_ONE  # 1 share would take gross to 20500
+
+
+def test_gross_room_is_spent_at_99_pct_after_its_buy_charges():
+    held = tuple(pos_view(s, 51, "100", product=CNC) for s in "BCD")  # 15300 of 20000
+    # Room 4700 < the 99% slot (4944.12, 105 shares at 47), so the room sizes the buy:
+    # (4700 - 5.58 buy charges) x 99% = 4647.48 -> 98 shares (100 before: all of 4700).
+    order = review(governor(), buy(), marks={"A": 47.0}, positions=held)
+    assert isinstance(order, Order) and order.qty == 98
+    no_buffer = review(governor(cash_buffer_pct=0), buy(), marks={"A": 47.0}, positions=held)
+    assert no_buffer.qty == 99  # 4694.42: the charges still come off
+    r = review(governor(), buy(), marks={"A": 4690.0}, positions=held)
+    assert reason(r) == RejectReason.QTY_BELOW_ONE  # 1 share fits 4700, not the buffered room
+    assert "room=4647.48" in r.detail
 
 
 def test_max_positions_and_a_pending_full_exit_frees_its_slot():

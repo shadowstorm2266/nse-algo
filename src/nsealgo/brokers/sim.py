@@ -7,9 +7,10 @@
 3. resting STOP/LIMIT orders per symbol: OCO entry legs (the one nearest the open
    fills, siblings are cancelled), then bracket children (stop before target).
 Every fill pays `costs.fill_charges` plus slippage. The DP charge applies to the
-first CNC sell of a scrip in each session. A CNC buy that free cash cannot cover is
+first CNC sell of a scrip in each session. A CNC buy that cash cannot cover is
 rejected (INSUFFICIENT_CASH), as a real broker would; "cash" is the funds view's
-buying power (see Portfolio.buying_power for the research sizing basis).
+buying power: real cash, not reduced by unrealized losses on delivery holdings (see
+Portfolio.cash, and Portfolio.buying_power for the research sizing basis).
 """
 
 import logging
@@ -235,7 +236,7 @@ class SimBroker:
             need, have = price * o.qty + charges.total, self._funds.buying_power()
             if need > have:
                 self._finish(
-                    st, OrderStatus.REJECTED, f"INSUFFICIENT_CASH: need {need:.2f}, free {have:.2f}"
+                    st, OrderStatus.REJECTED, f"INSUFFICIENT_CASH: need {need:.2f}, cash {have:.2f}"
                 )
                 return
         if _cnc_sell(o):

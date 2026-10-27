@@ -220,6 +220,26 @@ def test_cash_buffer_absorbs_a_one_pct_opening_gap(buffer_pct, rejected):
     assert len(bt.portfolio.trades) == 4 - len(rejected)
 
 
+@pytest.mark.parametrize(("buffer_pct", "rejected"), [(1, []), (0, ["E"])])
+def test_a_buy_sized_by_the_gross_room_keeps_the_buffer(buffer_pct, rejected):
+    # D0: buy A-D at 50 (98 each). A-C close D1 at 60, so selling D leaves ~5,270 of
+    # gross room (D's ~4,900 at the close plus cash) for E: less than a slot (~5,660).
+    # D's sale at the D2 open pays slippage and sell charges, so the room alone (105
+    # shares, charges deducted) is short of cash; 99% of it (104 shares) is not.
+    flat = {d: (50, 51, 49, 50) for d in (D0, D1, D2)}
+    up = {D0: (50, 51, 49, 50), D1: (50, 61, 49, 60), D2: (60, 61, 59, 60)}
+    frames = [daily_frame(s, up) for s in "ABC"] + [daily_frame(s, flat) for s in "DE"]
+    bars = pd.concat(frames, ignore_index=True)
+    first = [entry(s, Side.BUY, product=CNC, rank=i) for i, s in enumerate("ABCD", start=1)]
+    swap = [exit_("D", product=CNC), entry("E", Side.BUY, product=CNC, rank=1)]
+    strat = ScriptedStrategy(CNC, "1d", {ts(D0, "15:30"): first, ts(D1, "15:30"): swap})
+    result, bt = run_frames(strat, bars, [D0, D1, D2], swing={"cash_buffer_pct": buffer_pct})
+    cash = result.rejections[result.rejections["reason"] == "INSUFFICIENT_CASH"]
+    assert list(cash["symbol"]) == rejected
+    e_qty = [t.qty for t in bt.portfolio.trades if t.symbol == "E"]
+    assert e_qty == ([] if rejected else [104])
+
+
 def test_fills_frame_has_every_fill_with_charges_slippage_and_dp():
     bars = _daily("A", 100.0)
     strat = ScriptedStrategy(

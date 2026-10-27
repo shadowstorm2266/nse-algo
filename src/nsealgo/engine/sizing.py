@@ -3,6 +3,7 @@
 from dataclasses import dataclass
 from decimal import ROUND_FLOOR, Decimal
 
+from nsealgo.costs import BrokerageModel, StatutoryRates, fill_charges
 from nsealgo.engine.types import RejectReason
 
 
@@ -59,31 +60,42 @@ def swing_qty(
     *,
     price: Decimal,
     equity: Decimal,
-    est_buy_charges: Decimal,
+    rates: StatutoryRates,
+    delivery: BrokerageModel,
     max_positions: int,
     cash_buffer_pct: Decimal,
     position_cap: Decimal,
     remaining_gross: Decimal,
 ) -> SwingSize:
-    """Equal-weight shares: slot = (equity - estimated buy charges) / max_positions,
-    of which (100 - cash_buffer_pct)% is spent (the rest absorbs an opening gap).
+    """Equal-weight shares. slot = equity / max_positions and room = the gross cap left,
+    each less its estimated buy charges and spent at (100 - cash_buffer_pct)% (the rest
+    absorbs an opening gap, slippage and same-morning sell charges).
 
-    If that buys no whole share but one share fits the position cap (and the gross
-    cap), buy one. If one share is above the position cap, skip the stock. The caps
-    are not reduced by the buffer.
+    If the slot buys no whole share but one share fits the position cap (and the room),
+    buy one. If one share is above the position cap, skip the stock. The position cap
+    is not reduced by the buffer.
     """
     if price > position_cap:
         detail = f"1 share at {price:.2f} > position cap {position_cap:.2f}"
         return SwingSize(0, RejectReason.PRICE_ABOVE_POSITION_CAP, detail)
-    slot = (equity - est_buy_charges) / max_positions * (1 - cash_buffer_pct / 100)
+    keep = 1 - cash_buffer_pct / 100
+    slot = _after_buy_charges(equity / max_positions, rates, delivery) * keep
+    room = _after_buy_charges(remaining_gross, rates, delivery) * keep
     by_slot = floor_shares(slot, price)
     by_cap = floor_shares(position_cap, price)
-    by_gross = floor_shares(remaining_gross, price)
+    by_gross = floor_shares(room, price)
     qty = min(max(by_slot, 1), by_cap, by_gross)
     detail = (
-        f"slot={slot:.2f} by_slot={by_slot} by_cap={by_cap} by_gross={by_gross} "
-        f"remaining_gross={remaining_gross:.2f}"
+        f"slot={slot:.2f} room={room:.2f} by_slot={by_slot} by_cap={by_cap} "
+        f"by_gross={by_gross} remaining_gross={remaining_gross:.2f}"
     )
     if qty < 1:
         return SwingSize(0, RejectReason.QTY_BELOW_ONE, detail)
     return SwingSize(qty, None, detail)
+
+
+def _after_buy_charges(value: Decimal, rates: StatutoryRates, delivery: BrokerageModel) -> Decimal:
+    """`value` less the estimated CNC buy charges on a buy of that size."""
+    if value <= 0:
+        return value
+    return value - fill_charges("CNC", "BUY", value, rates, delivery).total

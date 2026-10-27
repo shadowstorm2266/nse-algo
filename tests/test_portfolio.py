@@ -76,6 +76,21 @@ def test_cnc_uses_full_cash_as_margin(pf):
     assert pf.margin_used() == D(1000)
 
 
+def test_cash_for_cnc_buys_ignores_holding_losses_but_not_mis_losses(pf):
+    pf.apply_fill(make_fill(Side.BUY, 10, "100", "100", cost="1", product=Product.CNC))
+    pf.mark("X", 80.0)  # the delivery holding is down 200
+    assert pf.unrealized() == D(-200)
+    assert pf.cash() == D(20000) - 1 - 1000  # paid for in full: the loss moves no cash
+    assert pf.buying_power() == pf.cash()
+    assert pf.free_cash() == pf.cash() - 200  # MIS free margin still counts the loss
+    pf.apply_fill(make_fill(Side.SELL, 10, "50", "50", symbol="Y", cost="1"))
+    pf.mark("Y", 60.0)  # an MIS short down 100 is a cash loss
+    assert pf.unrealized(Product.MIS) == D(-100)
+    assert pf.cash() == pf.ledger - 100 - pf.margin_used()
+    pf.mark("X", 130.0)  # gains are not spendable
+    assert pf.cash() == pf.ledger - 100 - pf.margin_used()
+
+
 def test_session_start_equity_and_peak(pf):
     pf.start_session(make_fill(Side.BUY, 1, "1", "1").session_date)
     assert pf.equity_at_session_start == D(20000)

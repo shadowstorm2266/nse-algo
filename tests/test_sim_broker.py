@@ -219,6 +219,17 @@ def test_cnc_buy_that_cash_cannot_cover_is_rejected_and_logged(broker, pf):
     assert not pf.positions
 
 
+def test_cnc_buy_is_checked_against_cash_not_reduced_by_holding_losses(broker, pf):
+    broker.place(cnc("A", Side.BUY, 100))
+    broker.process({"A": daily("A", DAY2, 100)})
+    pf.mark("A", 50.0)  # the holding is down 5,003 (bought at 100.03)
+    cash = pf.ledger - pf.margin_used()  # ~9,985
+    assert pf.buying_power() == cash and pf.free_cash() == cash - D("5003.00")
+    oid = broker.place(cnc("B", Side.BUY, 95))  # ~9,514 with charges: fits cash, not free cash
+    broker.process({"B": daily("B", DAY3, 100)})
+    assert status(broker, oid) is OrderStatus.FILLED and pf.positions["B"].qty == 95
+
+
 def test_dp_charge_once_per_scrip_per_sell_day(broker, pf):
     broker.place(cnc("A", Side.BUY, 30))
     broker.process({"A": Bar("A", ts(DAY, "10:00"), DAY, 100, 101, 99, 100)})
