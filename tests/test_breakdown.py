@@ -4,7 +4,16 @@ import pandas as pd
 import pytest
 
 from nsealgo.data.calendar import IST
-from nsealgo.reporting.breakdown import breakdown, entry_year, yearly_equity
+from nsealgo.reporting.breakdown import (
+    breakdown,
+    cap_skips,
+    entry_year,
+    holding_days,
+    legs_from_fills,
+    legs_from_trades,
+    yearly_activity,
+    yearly_equity,
+)
 
 
 def _trades() -> pd.DataFrame:
@@ -62,3 +71,70 @@ def test_yearly_drawdown_over_capital_when_a_year_starts_below_zero():
     assert y.loc[2016, "max_drawdown_pct"] == pytest.approx(105.0)  # 21,000 of 20,000
     assert y.loc[2017, "max_drawdown_rs"] == pytest.approx(3_000.0)  # peak -500 to -3,500
     assert y.loc[2017, "max_drawdown_pct"] == pytest.approx(15.0)
+
+
+def _fills() -> pd.DataFrame:
+    rows = [
+        # ts, side, value, charges, dp_charge, slippage
+        ("2016-11-01 09:15", "BUY", 5_000.0, 6.0, 0.0, 1.5),
+        ("2016-11-01 09:15", "BUY", 4_000.0, 5.0, 0.0, 1.2),
+        ("2016-12-01 09:15", "SELL", 5_500.0, 16.0, 9.0, 1.6),
+        ("2017-01-02 09:15", "SELL", 3_800.0, 15.0, 9.0, 1.1),
+    ]
+    df = pd.DataFrame(rows, columns=["ts", "side", "value", "charges", "dp_charge", "slippage"])
+    df["ts"] = pd.to_datetime(df["ts"]).dt.tz_localize(IST)
+    return df
+
+
+def test_yearly_activity_from_fills_is_by_fill_year():
+    y = yearly_activity(legs_from_fills(_fills()), 20_000.0)
+    assert list(y.index) == [2016, 2017]
+    assert y.loc[2016, "buys_rs"] == 9_000.0 and y.loc[2016, "sells_rs"] == 5_500.0
+    assert y.loc[2016, "turnover_x"] == pytest.approx(14_500 / 2 / 20_000)
+    assert y.loc[2016, "costs_rs"] == pytest.approx(27.0 + 4.3)
+    assert y.loc[2016, "costs_pct_capital"] == pytest.approx(31.3 / 20_000 * 100)
+    assert y.loc[2017, "dp_rs"] == 9.0 and y.loc[2017, "buys_rs"] == 0.0
+
+
+def test_legs_from_trades_put_round_trip_costs_on_the_exit():
+    t = pd.DataFrame(
+        {
+            "trade_id": [1, 2],
+            "side": ["long", "short"],
+            "qty": [10, 5],
+            "entry_time": pd.to_datetime(["2016-03-01 10:00", "2016-12-30 10:00"]),
+            "exit_time": pd.to_datetime(["2016-03-01 14:00", "2017-01-02 10:00"]),
+            "entry_price": [100.0, 200.0],
+            "exit_price": [101.0, 190.0],
+            "costs": [2.0, 3.0],
+            "slippage": [0.5, 0.25],
+        }
+    )
+    y = yearly_activity(legs_from_trades(t), 20_000.0)
+    assert y.loc[2016, "buys_rs"] == 1_000.0 and y.loc[2016, "sells_rs"] == 1_010.0 + 1_000.0
+    assert y.loc[2017, "buys_rs"] == 950.0 and y.loc[2017, "costs_rs"] == 3.25
+    assert y["dp_rs"].isna().all()  # not separable from trades
+
+
+def test_cap_skips_by_decision_and_holding_days():
+    rej = pd.DataFrame(
+        {
+            "now": pd.to_datetime(["2017-10-31 15:30", "2017-10-31 15:30", "2017-11-30 15:30"]),
+            "symbol": ["MARUTI", "X", "MARUTI"],
+            "reason": ["PRICE_ABOVE_POSITION_CAP", "MAX_POSITIONS", "PRICE_ABOVE_POSITION_CAP"],
+            "price": [8220.0, 10.0, 8300.0],
+            "rank": [2, 5, 3],
+        }
+    )
+    skips = cap_skips(rej)
+    assert list(skips["symbol"]) == ["MARUTI", "MARUTI"] and list(skips["rank"]) == [2, 3]
+    assert skips["decision"].nunique() == 2
+    assert cap_skips(rej.iloc[0:0]).empty
+    t = pd.DataFrame(
+        {
+            "trade_id": [1, 1, 2],
+            "entry_time": pd.to_datetime(["2017-01-02", "2017-01-02", "2017-03-01"]),
+            "exit_time": pd.to_datetime(["2017-01-12", "2017-02-01", "2017-03-02"]),
+        }
+    )
+    assert holding_days(t).tolist() == [30.0, 1.0]  # last exit of a trade

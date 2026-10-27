@@ -18,6 +18,7 @@ class Strategy(Protocol):
     product: Product  # MIS (intraday) or CNC (swing)
     timeframe: str  # "1m", "5m", "15m" (MIS) or "1d" (CNC)
     lookback_sessions: int  # daily bars of history before the period start ("1d" only)
+    reference_symbols: tuple[str, ...]  # read, never traded (e.g. an index); data may be missing
 
     def params(self) -> dict[str, Any]: ...
 

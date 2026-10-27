@@ -34,6 +34,7 @@ from nsealgo.engine.risk import RiskGovernor
 from nsealgo.engine.sessions import TIMEFRAMES, TradingCalendar, check_on_grid, session_close
 from nsealgo.engine.types import (
     ExitReason,
+    Fill,
     HaltRecord,
     IntentKind,
     OrderIntent,
@@ -49,9 +50,30 @@ logger = logging.getLogger("nsealgo.engine")
 REJECTION_COLS = ["now", "symbol", "reason", "detail", "kind", "price", "rank", "group_id"]
 
 
+FILL_COLS = [
+    "order_id",
+    "symbol",
+    "product",
+    "side",
+    "qty",
+    "ts",
+    "session_date",
+    "price",
+    "ref_price",
+    "value",
+    "slippage",
+    "charges",
+    "dp_charge",
+    "role",
+    "exit_reason",
+    "group_id",
+]
+
+
 @dataclass(frozen=True)
 class BacktestResult:
     trades: pd.DataFrame
+    fills: pd.DataFrame
     equity: pd.DataFrame
     intents: list[tuple[pd.Timestamp, OrderIntent]]
     rejections: pd.DataFrame
@@ -100,7 +122,7 @@ class Backtester:
             brokerage_preset,
             slippage_bps,
             funds=self.portfolio,
-            on_fill=self.portfolio.apply_fill,
+            on_fill=self._on_fill,
         )
         self.risk = RiskGovernor(
             risk_config,
@@ -113,6 +135,7 @@ class Backtester:
             kill_file=kill_file,
         )
         self.intents: list[tuple[pd.Timestamp, OrderIntent]] = []
+        self.fills: list[Fill] = []
         self.rejections: list[Rejection] = []
         self.equity_rows: list[dict[str, Any]] = []
         self.fallback_exits = 0
@@ -227,11 +250,16 @@ class Backtester:
 
     # --- helpers ---
 
+    def _on_fill(self, fill: Fill) -> TradeRecord | None:
+        self.fills.append(fill)
+        return self.portfolio.apply_fill(fill)
+
     def _context(self, sl: SessionSlice, now: pd.Timestamp, now_ns: int) -> StrategyContext:
         return StrategyContext(
             now=now,
             session_date=sl.day,
             session_no_trade=self.calendar.is_no_trade(sl.day),
+            next_session=self.calendar.next_session_after(sl.day),
             symbols=self.universe,
             positions=self.portfolio.position_views(),
             working_orders=tuple(
@@ -261,6 +289,7 @@ class Backtester:
         ]
         return BacktestResult(
             trades=trades_frame(self.portfolio.trades),
+            fills=fills_frame(self.fills),
             equity=_frame([_plain_row(r) for r in self.equity_rows]),
             intents=self.intents,
             rejections=_frame(
@@ -291,3 +320,30 @@ def _frame(rows: list[dict[str, Any]], columns: list[str] | None = None) -> pd.D
 def trades_frame(trades: list[TradeRecord]) -> pd.DataFrame:
     cols = list(TradeRecord.__dataclass_fields__)
     return _frame([_plain_row(asdict(t)) for t in trades], cols)
+
+
+def fills_frame(fills: list[Fill]) -> pd.DataFrame:
+    """One row per fill. `value` and `slippage` are rupees; `charges` is the order's total
+    charges and `dp_charge` its DP charge before GST (GST on it is inside `charges`)."""
+    rows = [
+        {
+            "order_id": f.order_id,
+            "symbol": f.symbol,
+            "product": f.product.value,
+            "side": f.side.value,
+            "qty": f.qty,
+            "ts": f.ts,
+            "session_date": f.session_date,
+            "price": float(f.price),
+            "ref_price": float(f.ref_price),
+            "value": float(f.value),
+            "slippage": float(f.slippage),
+            "charges": float(f.charges.total),
+            "dp_charge": float(f.charges.dp_charge),
+            "role": f.role.value,
+            "exit_reason": f.exit_reason.value if f.exit_reason is not None else None,
+            "group_id": f.group_id,
+        }
+        for f in fills
+    ]
+    return _frame(rows, FILL_COLS)

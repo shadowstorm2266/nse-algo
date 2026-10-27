@@ -54,6 +54,11 @@ class TradingCalendar:
     def is_no_trade(self, day: date) -> bool:
         return day in self.no_trade
 
+    def next_session_after(self, day: date) -> date | None:
+        """The next session on the calendar, tradeable or not; None after the last."""
+        i = bisect_right(self.sessions, day)
+        return self.sessions[i] if i < len(self.sessions) else None
+
     def next_tradeable_after(self, day: date) -> date | None:
         i = bisect_right(self.sessions, day)
         for d in self.sessions[i:]:

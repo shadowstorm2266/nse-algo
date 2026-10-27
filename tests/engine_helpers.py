@@ -226,6 +226,7 @@ class ScriptedStrategy:
     name: str = "scripted"
     version: str = "test"
     lookback_sessions: int = 0
+    reference_symbols: tuple[str, ...] = ()
     seen: list[Any] = field(default_factory=list, compare=False)
 
     def params(self) -> dict[str, Any]:
@@ -297,16 +298,18 @@ def run_frames(
     features: pd.DataFrame | None = None,
     mode: str = "backtest",
     margin_pct: str = "25",
+    universe: list[str] | None = None,
     **risk_overrides: Any,
 ):
-    """Run a Backtester on in-memory frames; returns (result, backtester)."""
+    """Run a Backtester on in-memory frames; returns (result, backtester). The universe
+    defaults to every symbol in `bars`; pass it to load bars the strategy never trades."""
     from nsealgo.engine.backtest import Backtester
     from nsealgo.engine.market import MarketData
     from nsealgo.engine.sessions import TradingCalendar
 
     bt = Backtester(
         strategy,
-        universe=sorted(bars["symbol"].unique()),
+        universe=universe or sorted(bars["symbol"].unique()),
         calendar=TradingCalendar(days, no_trade),
         risk_config=risk_config(**risk_overrides),
         margins=margins(margin_pct),

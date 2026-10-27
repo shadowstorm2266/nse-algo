@@ -1,0 +1,24 @@
+# Strategy 2: monthly momentum, swing (CNC delivery, daily bars).
+# Every parameter lives here; the code has no defaults. Changing a default here is a new
+# strategy version: bump SwingMomentumStrategy.version in
+# src/nsealgo/strategies/swing_momentum.py.
+# Universe: config/universe.yaml. Equal weight, whole shares, the 30% per-position cap,
+# max_positions (4) and the sizing basis belong to config/risk.yaml (swing block) and are
+# enforced by the RiskGovernor, not here.
+#
+# Decision after the close of the last session of each month (M), using data up to that
+# close; orders fill at the next tradeable session's open.
+
+top_n: 4                # hold the top N by momentum
+lookback_months: 6      # momentum = close at the end of month M-skip over the close at the
+skip_months: 1          #   end of month M-skip-lookback, minus 1 (skips the latest month)
+trend_ma_sessions: 200  # keep only stocks whose close is above their N-session simple average
+# false: holdings still in the top N are kept as they are (no top-up or trim); only stocks
+# that drop out are sold and only newcomers are bought. true is not implemented: the engine
+# holds one position per symbol and cannot add to it.
+resize_holdings: false
+
+market_filter:          # at a rebalance, go to cash when the index closes below its average
+  enabled: false
+  index_symbol: NIFTY 50  # data/clean has no NIFTY 50 bars: without them the filter is skipped
+  ma_sessions: 200        #   (the backtest CLI warns and records it in the trial)

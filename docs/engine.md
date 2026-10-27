@@ -10,6 +10,7 @@ and live mode; only the broker and the bar source differ.
 |---|---|
 | `strategies/base.py` | `Strategy` protocol: `on_bar(ctx) -> list[OrderIntent]`, pure |
 | `strategies/orb.py` | Strategy 1, 30-minute Opening Range Breakout (`config/strategies/orb.yaml`) |
+| `strategies/swing_momentum.py` | Strategy 2, monthly momentum, swing CNC (`config/strategies/swing.yaml`, CLI name `swing`) |
 | `engine/context.py` | `StrategyContext`: only what is visible at `now` |
 | `engine/risk.py` | `RiskGovernor`: the only code that turns intents into orders |
 | `engine/sizing.py`, `engine/exposure.py` | pure qty and exposure arithmetic for the RiskGovernor |
@@ -18,6 +19,7 @@ and live mode; only the broker and the bar source differ.
 | `engine/backtest.py` | the event loop |
 | `engine/loader.py` | DuckDB inputs, research periods, holdout lock |
 | `reporting/metrics.py`, `reporting/trials.py` | metrics and the trial log |
+| `reporting/breakdown.py` | by year/side/symbol, turnover and costs by fill year, cap skips |
 
 ## Strategy parameters
 
@@ -36,6 +38,10 @@ The loop walks bar groups (all symbols' bars that start at the same time):
 3. At `now` = the bars' `available_at`, the RiskGovernor places forced exits (MIS at
    or after `flat_by`). The strategy then gets a context of everything visible at
    `now`, and each intent goes RiskGovernor -> broker.
+
+The context also carries `next_session`, the next date on the trading calendar
+(tradeable or not; None after the last), which the exchange holiday list gives in
+advance. A monthly strategy uses it to know it is on the last session of a month.
 
 So a signal on bar T fills at bar T+1's open at the earliest. A fill inside bar T+1
 becomes visible at T+1's `available_at`. Daily bars have `ts` 09:15 and `available_at`
@@ -148,16 +154,28 @@ saved to `rejections.parquet`.
   - net = gross - slippage - costs.
   - R = net / (|entry - initial stop| x qty), empty without a stop.
 - `equity.parquet`: one row per session (equity, ledger, unrealized, daily_pnl, ...).
+- `fills.parquet`: one row per fill: order_id, symbol, product, side, qty, ts (start of
+  the fill bar), session_date, price (with slippage), ref_price, value, slippage (Rs),
+  charges (the order's total), dp_charge (before GST; its GST is inside charges), role,
+  exit_reason, group_id.
 - `rejections.parquet`, `metrics.json`.
+
+A strategy may list `reference_symbols` (an index it reads but never trades). They are
+loaded with the universe; if one has no bars, or misses sessions, in the period, the
+CLI prints a WARNING, the trial record's `warnings` says so, and the strategy skips
+whatever needed it.
 
 Every run appends one line to `research/trials.jsonl` (append-only; the DSR trial
 count). The line holds the git hash and dirty flag, strategy and version, params,
-period, cost tier, slippage, brokerage preset, universe, metrics and the run dir. A run
+period, cost tier, slippage, brokerage preset, universe, metrics, warnings and the run
+dir. A run
 with the `zero` brokerage preset or the `none` (0 bps) slippage tier is flagged
 `reference_tier: true`: a labelled reference, never a tradeable result.
 
 `scripts/report_runs.py` prints markdown tables from run directories (`summary` for
-one row per run, `detail` for one run by year, side, exit reason and symbol).
+one row per run, `detail` for one run by year, side, exit reason and symbol, plus
+turnover and costs by the year of each fill, holding periods, position-cap skips and
+rejections). Turnover is one-way: (bought + sold) / 2 / capital.
 
 ## Metrics
 
@@ -194,7 +212,7 @@ re-checks that no session on or after `holdout_start` is read without permission
 - Charges are per order, not per contract note. Each leg's components are rounded
   separately.
 - Universe membership is not point-in-time (see `config/universe.yaml`).
-- Calendar `no_trade` flags (outage days) are known to the engine in advance. Swing
-  orders deferred past an outage day use that knowledge; in reality the outage was
-  only known on the day.
+- The calendar is known in advance: `next_session` in the context, and `no_trade` flags
+  (outage days). Swing orders deferred past an outage day use that knowledge; in
+  reality the outage was only known on the day.
 - 15m bars cannot run MIS: 14:50 is not on the 15m grid.

@@ -1,17 +1,19 @@
 import json
+from datetime import date
 from pathlib import Path
 
 import pandas as pd
 import pytest
 
 from nsealgo import strategies
-from nsealgo.backtest import RunPaths, main, run_backtest
+from nsealgo.backtest import RunPaths, coverage_warnings, main, run_backtest
 from nsealgo.data.calendar import build_calendar
 from nsealgo.data.features import daily_bars, daily_features, rvol_profile
 from nsealgo.data.resample import resample_bars, with_available_at
 from nsealgo.data.store import write_bars, write_calendar, write_symbol_table
 from nsealgo.engine.loader import (
     HoldoutLockedError,
+    Period,
     check_holdout,
     load_research_config,
     resolve_period,
@@ -127,6 +129,31 @@ def test_cli_orb_logs_yaml_params_with_overrides(paths):
     assert p["filters"]["gap"] == {"enabled": False, "max_abs_pct": 0.8}
     assert trial["strategy"] == "orb" and trial["strategy_version"] == "1"
     assert trial["sizing_basis"] == trial["metrics"]["sizing_basis"] == "fixed_capital"
+
+
+def test_cli_swing_writes_fills_and_warns_when_the_index_is_missing(paths, capsys):
+    params = '{"market_filter": {"enabled": true}}'
+    argv = ["--strategy", "swing", "--symbols", "AAA,BBB", "--params", params]
+    assert main(argv, paths) == 0
+    (trial,) = read_trials(paths.trials)
+    (warning,) = trial["warnings"]
+    assert "'NIFTY 50'" in warning and "no bars" in warning and "whole run" in warning
+    assert f"WARNING: {warning}" in capsys.readouterr().out
+    assert (Path(trial["run_dir"]) / "fills.parquet").is_file()
+
+
+def test_cli_loads_a_present_index_without_trading_it(paths):
+    params = '{"market_filter": {"enabled": true, "index_symbol": "BBB"}}'
+    assert main(["--strategy", "swing", "--symbols", "AAA", "--params", params], paths) == 0
+    (trial,) = read_trials(paths.trials)
+    assert trial["warnings"] == [] and trial["universe"] == ["AAA"]
+
+
+def test_coverage_warnings():
+    period = Period("dev", date(2016, 1, 1), date(2016, 12, 30), holdout=False)
+    assert coverage_warnings({"IDX": 250}, 250, period) == []
+    (partial,) = coverage_warnings({"IDX": 200}, 250, period)
+    assert "200 of 250 sessions" in partial and "where" in partial
 
 
 def test_cli_holdout_needs_the_flag(paths, toy, capsys):

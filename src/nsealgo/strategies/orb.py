@@ -143,6 +143,7 @@ class OrbStrategy:
     version = "1"  # bump on any logic change or change of a default in orb.yaml
     product = Product.MIS
     lookback_sessions = 0
+    reference_symbols: tuple[str, ...] = ()
 
     def __init__(self, **params: Any) -> None:
         self.p = OrbParams.model_validate(params)

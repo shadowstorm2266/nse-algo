@@ -190,6 +190,42 @@ def test_swing_decision_fills_next_open_and_skips_no_trade_days():
     assert len(result.equity) == 5
 
 
+def test_context_next_session_is_the_next_calendar_session():
+    # The calendar (exchange holiday list) is known in advance; no_trade days are sessions.
+    strat = ScriptedStrategy(CNC, "1d", {})
+    run_frames(strat, _daily("A", 100.0, days=(D0, D1, D2, D3)), [D0, D1, D2, D3], no_trade=(D2,))
+    assert [(c.session_date, c.next_session) for c in strat.seen] == [
+        (D0, D1),
+        (D1, D2),
+        (D2, D3),
+        (D3, None),
+    ]
+
+
+def test_fills_frame_has_every_fill_with_charges_slippage_and_dp():
+    bars = _daily("A", 100.0)
+    strat = ScriptedStrategy(
+        CNC,
+        "1d",
+        {
+            ts(D0, "15:30"): [entry("A", Side.BUY, product=CNC, rank=1)],
+            ts(D1, "15:30"): [exit_("A", product=CNC)],
+        },
+    )
+    result, bt = run_frames(strat, bars, [D0, D1, D2])
+    (trade,) = bt.portfolio.trades
+    f = result.fills
+    assert list(f["side"]) == ["BUY", "SELL"] and list(f["role"]) == ["ENTRY", "EXIT"]
+    assert list(f["session_date"]) == [D1, D2] and list(f["qty"]) == [49, 49]
+    assert f["price"].tolist() == pytest.approx([100.03, 99.97])
+    assert f["value"].tolist() == pytest.approx([100.03 * 49, 99.97 * 49])
+    assert f["dp_charge"].tolist() == [0.0, 9.0]  # shoonya, before GST, on the sale
+    assert f["charges"].sum() == pytest.approx(float(trade.costs))
+    assert f["slippage"].sum() == pytest.approx(float(trade.slippage))
+    assert f["exit_reason"].isna().tolist() == [True, False]
+    assert f["exit_reason"].iloc[1] == "strategy"
+
+
 def test_swing_skips_unaffordable_rank_and_takes_the_next():
     bars = pd.concat([_daily("A", 7000.0), _daily("B", 100.0), _daily("C", 50.0)])
     picks = [

@@ -108,6 +108,28 @@ def load_calendar(con: duckdb.DuckDBPyConnection, start: date, end: date) -> pd.
     ).df()
 
 
+def session_counts(
+    con: duckdb.DuckDBPyConnection,
+    symbols: Sequence[str],
+    period: tuple[date, date],
+    *,
+    research: ResearchConfig,
+    allow_holdout: bool,
+) -> dict[str, int]:
+    """Sessions with bars per symbol in the inclusive `period` (0 for symbols without data)."""
+    start, end = period
+    check_holdout(end, research, allow_holdout)
+    if not symbols:
+        return {}
+    rows = con.execute(
+        "SELECT symbol, count(DISTINCT session_date) FROM bars_1m "
+        f"WHERE symbol IN {_in_list(symbols)} AND session_date BETWEEN ? AND ? GROUP BY symbol",
+        [start, end],
+    ).fetchall()
+    found = {s: int(n) for s, n in rows}
+    return {s: found.get(s, 0) for s in symbols}
+
+
 def lookback_start(con: duckdb.DuckDBPyConnection, start: date, sessions: int) -> date:
     """The session `sessions` sessions before `start` (or `start` itself for 0)."""
     if sessions <= 0:

@@ -3,9 +3,13 @@
     uv run python -m nsealgo.backtest --strategy NAME --period dev --cost-tier base
 
 Writes research/runs/<stamp>_<strategy>_<period>_<tier>/ (trades.parquet,
-equity.parquet, rejections.parquet, metrics.json) and appends one line to
+fills.parquet, equity.parquet, rejections.parquet, metrics.json) and appends one line to
 research/trials.jsonl. The holdout period needs --run-holdout and runs once per
 strategy version. Backtests never read the KILL file (see docs/engine.md).
+
+A strategy's reference symbols (e.g. an index it reads but never trades) are loaded
+with the universe. Missing reference data is printed as a WARNING and recorded in the
+trial's `warnings`; the strategy then skips whatever needed it.
 """
 
 import argparse
@@ -38,6 +42,7 @@ from nsealgo.engine.loader import (
     load_universe,
     market_chunks,
     resolve_period,
+    session_counts,
 )
 from nsealgo.engine.sessions import TradingCalendar
 from nsealgo.reporting.metrics import compute_metrics
@@ -63,6 +68,24 @@ class RunPaths:
     strategies: Path = STRATEGY_CONFIG_DIR
 
 
+def coverage_warnings(counts: dict[str, int], sessions: int, period: Period) -> list[str]:
+    """Warnings for reference symbols with bars on fewer than all `sessions` of the period."""
+    span = f"{period.start}..{period.end}"
+    out = []
+    for symbol, n in counts.items():
+        if n == 0:
+            out.append(
+                f"reference symbol {symbol!r} has no bars in {span}: the strategy skips "
+                "what needs it (e.g. the market filter) for the whole run"
+            )
+        elif n < sessions:
+            out.append(
+                f"reference symbol {symbol!r} has bars on {n} of {sessions} sessions in "
+                f"{span}: the strategy skips what needs it where they are missing"
+            )
+    return out
+
+
 def _simulate(
     strategy: Strategy,
     period: Period,
@@ -73,14 +96,22 @@ def _simulate(
     universe: list[str],
     allow_holdout: bool,
     paths: RunPaths,
-) -> tuple[BacktestResult, Backtester]:
+) -> tuple[BacktestResult, Backtester, list[str]]:
     research = load_research_config(paths.research)
     con = connect(paths.clean_dir)
     calendar = TradingCalendar.from_frame(load_calendar(con, period.start, period.end))
+    refs = [s for s in strategy.reference_symbols if s not in universe]
+    counts = session_counts(
+        con,
+        refs,
+        (period.start, period.end),
+        research=research,
+        allow_holdout=allow_holdout,
+    )
     chunks = market_chunks(
         con,
         strategy.timeframe,
-        universe,
+        universe + refs,
         list(calendar.sessions),
         lookback_sessions=strategy.lookback_sessions,
         research=research,
@@ -98,12 +129,14 @@ def _simulate(
         mode="backtest",
         kill_file=None,
     )
-    return bt.run(chunks), bt
+    warnings = coverage_warnings(counts, len(calendar.sessions), period)
+    return bt.run(chunks), bt, warnings
 
 
 def _write_outputs(run_dir: Path, result: BacktestResult, metrics: dict[str, Any]) -> None:
     run_dir.mkdir(parents=True, exist_ok=False)
     result.trades.to_parquet(run_dir / "trades.parquet", index=False)
+    result.fills.to_parquet(run_dir / "fills.parquet", index=False)
     result.equity.to_parquet(run_dir / "equity.parquet", index=False)
     result.rejections.astype({"now": "object"}).to_parquet(
         run_dir / "rejections.parquet", index=False
@@ -145,6 +178,7 @@ def _trial_record(
     metrics: dict[str, Any],
     run_at: datetime,
     run_dir: Path,
+    warnings: list[str],
 ) -> dict[str, Any]:
     return {
         "run_at": run_at.isoformat(),
@@ -165,6 +199,7 @@ def _trial_record(
         "capital": capital,
         "sizing_basis": metrics["sizing_basis"],
         "metrics": metrics,
+        "warnings": warnings,
         "run_dir": str(run_dir),
     }
 
@@ -185,7 +220,7 @@ def run_backtest(
         strategy, period_label, cost_tier, brokerage, allow_holdout, paths
     )
     universe = symbols or load_universe(paths.universe)
-    result, bt = _simulate(
+    result, bt, warnings = _simulate(
         strategy,
         period,
         costs=costs,
@@ -210,7 +245,17 @@ def run_backtest(
     _write_outputs(run_dir, result, metrics)
     slippage = float(costs.slippage_bps_per_side[cost_tier])
     record = _trial_record(
-        strategy, period, cost_tier, slippage, preset, universe, capital, metrics, run_at, run_dir
+        strategy,
+        period,
+        cost_tier,
+        slippage,
+        preset,
+        universe,
+        capital,
+        metrics,
+        run_at,
+        run_dir,
+        warnings,
     )
     append_trial(paths.trials, record)
     return record
@@ -269,6 +314,8 @@ def main(argv: list[str] | None = None, paths: RunPaths | None = None) -> int:
         "cost_share_of_gross",
     ]
     print(json.dumps({k: m.get(k) for k in keys}, indent=2))
+    for warning in record["warnings"]:
+        print(f"WARNING: {warning}")
     if record["reference_tier"]:
         print("REFERENCE TIER: no broker charges and/or no slippage; not a tradeable result")
     print(f"outputs: {record['run_dir']}")
