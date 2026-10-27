@@ -112,11 +112,12 @@ no entry window, no flat_by, no per-trade rupee risk and no daily loss stop.
   target or group), `MAX_ORDERS_PER_DAY`, `POSITION_EXISTS`, `MAX_POSITIONS`,
   `NO_NEXT_SESSION`, `NO_PRICE`, sizing.
 - Sizing: slot = equity / max_positions, and room = gross left under 100% of equity
-  (held positions at marks and pending entries at their reference price; a full
-  working exit frees its position). Each is reduced by the estimated buy charges on
-  that amount, then (100 - `cash_buffer_pct`)% of it is spent (99%: the rest absorbs a
-  normal opening gap, slippage and same-morning sell charges, so the buy is not
-  rejected for cash). qty = min(slot, 30% of equity, room) / price in whole shares;
+  after held positions at marks (a full working exit frees its position) and after what
+  each pending same-morning buy reserves: its notional at the reference price, plus
+  `cash_buffer_pct`, plus its estimated buy charges, so each buy keeps its own buffer.
+  Slot and room are each reduced by the estimated buy charges on that amount, then
+  (100 - `cash_buffer_pct`)% of it is spent (99%: the rest absorbs a normal opening
+  gap, slippage and same-morning sell charges, so the buy is not rejected for cash). qty = min(slot, 30% of equity, room) / price in whole shares;
   the buffer does not reduce the 30% position cap. "Equity" here is the sizing equity
   (see the sizing basis below).
 - If the buffered slot buys no share but one share fits the position cap and the room,

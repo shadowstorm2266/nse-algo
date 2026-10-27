@@ -123,6 +123,18 @@ def test_gross_room_is_spent_at_99_pct_after_its_buy_charges():
     assert "room=4647.48" in r.detail
 
 
+def test_pending_buys_take_their_size_plus_buffer_plus_buy_charges_from_the_room():
+    held = tuple(pos_view(s, 52, "100", product=CNC) for s in "BC")  # 10400 of 20000
+    d = working_order("D", Side.BUY, 49, "100", when=ts(DAYS[0], "15:30"), product=CNC)
+    # D reserves 4900 x 1.01 + 5.82 buy charges = 4954.82, so the room is
+    # (9600 - 4954.82 - 5.52) x 99% = 4593.26 -> 97 shares at 47 (98 if D took only 4900).
+    order = review(governor(), buy(), marks={"A": 47.0}, positions=held, orders=(view(1, d),))
+    assert isinstance(order, Order) and order.qty == 97
+    r = review(governor(), buy(), marks={"A": 4600.0}, positions=held, orders=(view(1, d),))
+    assert reason(r) == RejectReason.QTY_BELOW_ONE
+    assert "reserved=4954.82" in r.detail and "room=4593.26" in r.detail
+
+
 def test_max_positions_and_a_pending_full_exit_frees_its_slot():
     held = tuple(pos_view(s, 10, "100", product=CNC) for s in "BCDE")
     assert reason(review(governor(), buy(), positions=held)) == RejectReason.MAX_POSITIONS

@@ -83,13 +83,11 @@ def strategy_orders_today(snap: AccountSnapshot) -> int:
     )
 
 
-def swing_slots_and_gross(snap: AccountSnapshot) -> tuple[int, int, Decimal]:
-    """(held positions, pending entries, gross used). Positions with a working full exit
-    free their slot and their exposure: sells fill before buys at the open."""
+def swing_book(snap: AccountSnapshot) -> tuple[int, list[Decimal], Decimal]:
+    """(held positions, pending entries' notionals at their reference price, held gross at
+    marks). Positions with a working full exit free their slot and their exposure: sells
+    fill before buys at the open."""
     exiting = fully_exiting(snap)
-    held = {s: p for s, p in snap.positions.items() if s not in exiting}
-    pending = snap.working(OrderRole.ENTRY)
-    gross = sum((abs(p.qty) * p.mark for p in held.values()), ZERO) + sum(
-        (v.order.qty * v.order.ref_price for v in pending), ZERO
-    )
-    return len(held), len(pending), gross
+    held = [p for s, p in snap.positions.items() if s not in exiting]
+    pending = [v.order.qty * v.order.ref_price for v in snap.working(OrderRole.ENTRY)]
+    return len(held), pending, sum((abs(p.qty) * p.mark for p in held), ZERO)

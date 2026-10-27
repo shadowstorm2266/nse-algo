@@ -115,7 +115,7 @@ Final equity: swing Rs 37,552, benchmark Rs 89,114.
 |---|---|---|---|
 | Dev-period trades | >= 300 intraday, >= 100 swing | 3,785 (trial 7) | 139 (trial 12) |
 | Net expectancy at double the modeled slippage (stress1) | > 0 | -19.2 bps (trial 3) | +331.6 bps (trial 13) |
-| Long-only: beats equal-weight buy-and-hold of the universe after costs | overall and in most dev years | not long-only | -257.8 pp overall; ahead in 1 of 8 years |
+| Long-only: beats equal-weight buy-and-hold of the universe after costs | overall and in at least 5 of 8 dev years | not long-only | -257.8 pp overall; ahead in 1 of 8 years |
 | Walk-forward OOS expectancy, profit factor | > 0, >= 1.15 | not run | not run |
 | Parameter neighbours | >= 50% of chosen | not run | not run |
 | Deflated Sharpe | >= 0.90 | not computed | not computed |

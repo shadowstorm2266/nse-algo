@@ -23,7 +23,7 @@ from nsealgo.engine.exposure import (
     reference_price,
     sizing_shift,
     strategy_orders_today,
-    swing_slots_and_gross,
+    swing_book,
     trades_today,
 )
 from nsealgo.engine.portfolio import AccountSnapshot, PositionView
@@ -300,15 +300,15 @@ class RiskGovernor:
             return R.MAX_ORDERS_PER_DAY, f"{today} orders today"
         if intent.symbol in snap.positions or snap.working(OrderRole.ENTRY, intent.symbol):
             return R.POSITION_EXISTS, "one position or working entry per symbol"
-        held, pending, _ = swing_slots_and_gross(snap)
-        if held + pending >= sw.max_positions:
-            return R.MAX_POSITIONS, f"{held} held + {pending} pending"
+        held, pending, _ = swing_book(snap)
+        if held + len(pending) >= sw.max_positions:
+            return R.MAX_POSITIONS, f"{held} held + {len(pending)} pending"
         return None
 
     def _swing_size(self, snap: AccountSnapshot, price: Decimal) -> SwingSize:
         shift = sizing_shift(snap, self.config.capital, self.sizing_basis, self.product)
         sw, equity = self.config.swing, snap.equity + shift
-        _, _, gross = swing_slots_and_gross(snap)
+        _, pending, held_gross = swing_book(snap)
         return swing_qty(
             price=price,
             equity=equity,
@@ -317,7 +317,8 @@ class RiskGovernor:
             max_positions=sw.max_positions,
             cash_buffer_pct=sw.cash_buffer_pct,
             position_cap=equity * sw.max_position_pct / 100,
-            remaining_gross=equity * sw.max_gross_exposure_pct / 100 - gross,
+            gross_left=equity * sw.max_gross_exposure_pct / 100 - held_gross,
+            pending=pending,
         )
 
     # --- helpers ---

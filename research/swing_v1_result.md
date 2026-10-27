@@ -486,7 +486,7 @@ Reproduce sections 6 and 7:
   `research/runs/20261027-200650_swing_dev_stress1`);
 - `uv run python scripts/report_runs.py benchmark research/runs/20261027-200639_swing_dev_base --exclude ADANIENT`.
 
-**Engine changes after trials 12-13 (owner's decision, 2026-10-27; no trial rerun):**
+**Engine changes after trials 12-13 (owner's decisions, 2026-10-27 and 2026-10-28; no trial rerun):**
 
 - The broker's cash check for a CNC buy uses real cash (`Portfolio.cash`). Unrealized
   losses on delivery holdings no longer reduce it; MIS free margin is unchanged. The old
@@ -494,6 +494,9 @@ Reproduce sections 6 and 7:
 - A buy sized by the gross room is treated like one sized by its slot: the room less its
   estimated buy charges, at 99%. The old rule (all of the room, no allowance) caused the
   second table.
+- Each pending buy on the same morning is counted in a later buy's room at its notional
+  plus 1% plus its estimated buy charges, so an earlier buy's opening gap of up to about
+  1% does not use the later buy's cash.
 - Trials 12-13 ran before these changes. Every number in sections 6 and 7 is under the
   old rules.
 

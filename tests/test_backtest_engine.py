@@ -240,6 +240,30 @@ def test_a_buy_sized_by_the_gross_room_keeps_the_buffer(buffer_pct, rejected):
     assert e_qty == ([] if rejected else [104])
 
 
+@pytest.mark.parametrize(("buffer_pct", "rejected"), [(1, []), (0, ["F"])])
+def test_an_earlier_buy_gapping_up_does_not_leave_a_room_sized_buy_short(buffer_pct, rejected):
+    # D0: buy A-D at 50. A and B close D1 at 70, and C and D are sold. E (rank 1) is
+    # sized by its slot; F (rank 2) by the room left after E. E opens 1% up on D2.
+    # E is reserved in F's room at its size + 1% + its buy charges, so F keeps its cash
+    # (83 shares, Rs 12.49 to spare). Without the buffer, F is short.
+    up = {D0: (50, 51, 49, 50), D1: (50, 71, 49, 70), D2: (70, 71, 69, 70)}
+    flat = {d: (50, 51, 49, 50) for d in (D0, D1, D2)}
+    gap = {D0: (50, 51, 49, 50), D1: (50, 51, 49, 50), D2: (50.5, 51, 50, 50.5)}
+    frames = [daily_frame(s, up) for s in "AB"] + [daily_frame(s, flat) for s in "CDF"]
+    bars = pd.concat([*frames, daily_frame("E", gap)], ignore_index=True)
+    first = [entry(s, Side.BUY, product=CNC, rank=i) for i, s in enumerate("ABCD", start=1)]
+    sells = [exit_(s, product=CNC) for s in "CD"]
+    buys = [entry(s, Side.BUY, product=CNC, rank=i) for i, s in enumerate("EF", start=1)]
+    script = {ts(D0, "15:30"): first, ts(D1, "15:30"): sells + buys}
+    strat = ScriptedStrategy(CNC, "1d", script)
+    result, bt = run_frames(strat, bars, [D0, D1, D2], swing={"cash_buffer_pct": buffer_pct})
+    cash = result.rejections[result.rejections["reason"] == "INSUFFICIENT_CASH"]
+    assert list(cash["symbol"]) == rejected
+    qty = {t.symbol: t.qty for t in bt.portfolio.trades}
+    assert set(qty) == set("ABCDE") | ({"F"} - set(rejected))
+    assert qty.get("F") == (None if rejected else 83)
+
+
 def test_fills_frame_has_every_fill_with_charges_slippage_and_dp():
     bars = _daily("A", 100.0)
     strat = ScriptedStrategy(
