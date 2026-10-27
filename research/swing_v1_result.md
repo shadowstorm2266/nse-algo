@@ -1,5 +1,9 @@
 # Swing momentum v1 (strategy 2): dev-period result
 
+Sections 1-5 are version 1, trials 8-11, sized off fixed capital. Section 6 is the rerun
+after the owner's decisions (version 2, current-equity sizing, 1% cash buffer, trials
+12-13). Section 7 compares that base run with an equal-weight buy-and-hold benchmark.
+
 Monthly momentum on daily bars, delivery (CNC) only, `swing` version 1, parameters
 exactly as in `config/strategies/swing.yaml` at c6a7edf (not optimized):
 
@@ -272,5 +276,214 @@ of the notional.
 Reproduce the tables with `scripts/report_runs.py summary` and
 `scripts/report_runs.py detail <run dir> --all-symbols` on the run directories of
 trials 8-11.
+
+## 6. Rerun after the owner's decisions (trials 12-13)
+
+Owner decisions on 2026-10-27:
+
+- Kept as built:
+  - only top-4 newcomers are bought, and a skipped one leaves its slot in cash;
+  - momentum uses calendar month-end closes;
+  - item 5 was left as is.
+- CNC backtests now size off current equity (`sizing_basis.backtest.cnc:
+  current_equity`), as paper and live do. MIS backtests stay on fixed capital.
+- `swing.cash_buffer_pct: 1`: each buy is sized at 99% of its slot. The 30% position
+  cap and the 100% gross cap are not reduced.
+- A month whose last session is no_trade now decides on its last tradeable session
+  before it.
+  - No month-end in dev is a no_trade session, so this changes no dev decision.
+  - It is a logic change, so the strategy is now `swing` version 2 (commit 213926c).
+
+Run facts:
+
+- **Trials:** 12 (base) and 13 (stress1), lines 12-13 of `research/trials.jsonl`.
+  - Both on 213926c (clean tree), version 2, sizing `current_equity`, no run warnings.
+  - The DSR trial count is now 13: 7 ORB, 6 swing.
+- **Period, universe, costs and parameters:** as in sections 1-5, except sizing and the
+  buffer.
+- **Definitions under current-equity sizing:**
+  - Max DD % is of the running peak.
+  - Sharpe is on daily returns over the previous session's equity.
+  - Turnover and costs % are still over the Rs 20,000 starting capital. The account
+    ended near Rs 37,500.
+
+| Run | Sizing | Trades | Win % | Avg win Rs | Avg loss Rs | Gross bps | Cost bps | Net bps | PF | Max DD Rs | Max DD % | Sharpe (daily, ann.) | Net Rs | Cap skips | Turnover x/yr | Costs % cap/yr |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| Base, fixed capital, no buffer, v1 (trial 8) | fixed_capital | 133 | 51.1% | 756 | -456 | 391.3 | 55.7 | 335.6 | 1.73 | 9,886 | 49.4% | 0.55 | 21,761 | 4 | 3.86 | 2.0% |
+| Stress1, fixed capital, no buffer, v1 (trial 10) | fixed_capital | 132 | 50.8% | 762 | -459 | 391.1 | 61.8 | 329.3 | 1.71 | 10,034 | 50.2% | 0.53 | 21,233 | 4 | 3.83 | 2.2% |
+| Base, current equity, 1% buffer, v2 (trial 12) | current_equity | 139 | 51.1% | 740 | -514 | 377.8 | 50.1 | 327.7 | 1.50 | 11,732 | 48.0% | 0.46 | 17,552 | 1 | 4.96 | 2.3% |
+| Stress1, current equity, 1% buffer, v2 (trial 13) | current_equity | 140 | 52.1% | 716 | -520 | 388.7 | 57.0 | 331.6 | 1.50 | 11,809 | 48.2% | 0.46 | 17,457 | 1 | 4.93 | 2.6% |
+
+Max DD % is of capital in trials 8 and 10, and of the running peak in trials 12 and 13.
+
+- **Final equity:** base Rs 37,552 (+87.8%); stress1 Rs 37,457 (+87.3%).
+- **Drawdowns, base:** the largest percent and the largest rupee fall are different
+  episodes.
+  - Largest percent: 48.0%, from Rs 23,797 on 2017-09-14 to Rs 12,376 on 2020-03-23
+    (Rs 11,421).
+  - Largest rupee: Rs 11,732, from Rs 38,115 on 2021-10-18 to Rs 26,383 on 2022-06-20
+    (30.8% of that peak).
+- **Drawdown halt:** the 15% account-drawdown halt would have fired on 2018-03-06 in
+  both runs (record mode).
+- **Stress1 vs base:** stress1 has more net bps per trade than base (331.6 vs 327.7)
+  and fewer net rupees. Its buys rejected for cash differ from base's (below), which
+  changed later holdings.
+
+Gate A items measured so far, v2:
+
+| Gate A item | Threshold | Value |
+|---|---|---|
+| Dev-period trades (swing) | >= 100 | 139 (base, trial 12): 135 strategy exits + 4 end-of-run closes |
+| Net expectancy at double the modeled slippage (stress1, 6 bps) | > 0 | +331.6 bps/trade, Rs +124.7/trade (trial 13) |
+| Walk-forward OOS expectancy and profit factor | > 0 and >= 1.15 | not run |
+| Parameter neighbours | >= 50% of chosen | not run |
+| Deflated Sharpe | >= 0.90 | not computed (13 trials logged) |
+| Holdout | net positive, once | not run |
+| P(15% drawdown within 250 days) | < 10% | not computed |
+
+**Changes from trials 8 and 10, base tier:**
+
+- **2021 holdings.** No session held a single stock. The fixed-capital run held
+  ADANIENT alone from 2021-06-01 to 2021-10-29.
+  - In 2021 the book held 4 positions on 144 sessions and 3 on 103.
+  - From July to October 2021, Rs 1,410 of gross room was left. That was too little
+    for one share of GRASIM (2021-07-30, Rs 1,550) or BAJAJFINSV (2021-09-30,
+    Rs 1,780); both were rejected `QTY_BELOW_ONE`.
+- **ADANIENT.** It nets Rs 10,913 over 6 trades (Rs 13,351 in trial 8). The 2020-11-02
+  buy was 12 shares at Rs 329 (15 in trial 8), because the account was Rs 16,406 at
+  the 2020-10-30 decision.
+- **Rejections:** `QTY_BELOW_ONE` 5 (19 in trial 8), `PRICE_ABOVE_POSITION_CAP` 1
+  (4 in trial 8), `INSUFFICIENT_CASH` 10 (7 in trial 8).
+  - `QTY_BELOW_ONE`: MARUTI on 2016-10-28, 2016-11-30 and 2017-01-31 (one share above
+    the gross room left), plus the two 2021 cases above.
+  - The one cap skip is MARUTI on 2017-10-31 (Rs 8,220, rank 4). The cap is now 30% of
+    current equity, so it grew with the account.
+
+**Buys still rejected for cash at the open: 10 in base, 9 in stress1.** The 1% buffer
+applies to the slot. None of the 10 base rejections was a slot-sized buy that an opening
+gap left short of cash. Two engine rules cause them; nothing was changed.
+
+1. **Unrealized losses on held positions: 4 in base, the same 4 in stress1.** Real cash
+   covered the buy. But the free cash that the broker's cash check uses subtracts
+   unrealized losses on held positions (`Portfolio.free_cash`: ledger + any unrealized
+   loss - margin used). Real cash below is the starting capital plus sale values, minus
+   buy values and all charges, up to that order.
+
+   | Fill day | Symbol | Need Rs | Real cash Rs | Free cash Rs | Need / slot |
+   |---|---|---|---|---|---|
+   | 2017-01-02 | ONGC | 4,513.79 | 4,802.77 | 4,184.99 | 1.001 |
+   | 2019-09-03 | ICICIBANK | 4,056.52 | 4,335.54 | 3,221.42 | 0.965 |
+   | 2022-07-01 | ITC | 6,729.30 | 7,620.08 | 6,599.98 | 1.001 |
+   | 2023-02-01 | HINDALCO | 7,105.55 | 8,124.68 | 7,017.97 | 0.947 |
+
+2. **Sized by the gross room, not the slot: 6 in base, 5 in stress1.** These buys were
+   below their slot because the 100% gross cap bound.
+   - The gross room is equity minus kept holdings and earlier buys. That is the cash
+     left at the decision-day close.
+   - It carries no allowance for buy charges, slippage or a gap, and the buffer does
+     not apply to it.
+   - Real cash was short at the open (free cash equalled real cash here).
+
+   | Fill day | Symbol | Need Rs | Free cash Rs | Need / slot |
+   |---|---|---|---|---|
+   | 2017-03-01 | TATASTEEL | 4,394.52 | 4,388.18 | 0.888 |
+   | 2017-07-03 | BAJFINANCE | 5,390.00 | 5,232.51 | 0.984 |
+   | 2021-05-03 | TATASTEEL | 4,971.21 | 4,965.47 | 0.682 |
+   | 2021-07-01 | ADANIPORTS | 1,414.09 | 1,410.42 | 0.165 |
+   | 2021-09-01 | HINDALCO | 1,424.11 | 1,410.42 | 0.153 |
+   | 2022-09-01 | INDUSINDBK | 7,694.98 | 7,645.12 | 0.939 |
+
+   Stress1's five are TATASTEEL 2017-03-01, BAJFINANCE 2017-07-03, SBIN 2021-04-01,
+   HINDALCO 2021-06-01 and INDUSINDBK 2022-09-01.
+
+"Need" is the broker's figure (qty x fill price + charges). The slot is 99% of
+(equity - estimated buy charges) / 4 at the decision-day close.
+
+**Concentration, base (trial 12):**
+
+- Excluding the 5 largest winning trades: Rs -5,130.
+- Excluding trades entered in 2020: Rs 3,902.
+- Net bps per trade: median +15.7, standard deviation 3,086, standard error of the
+  mean 262 (n = 139).
+
+## 7. Swing (base, trial 12) vs equal-weight buy-and-hold
+
+**The benchmark** is not a strategy and not a trial. It is computed by
+`reporting/benchmark.py` and is not in `trials.jsonl`.
+
+- **Purchase:** the 40 universe symbols, Rs 500 each, bought once in fractional shares
+  at the 2016-01-04 open (the first dev session), at the open plus 3 bps.
+- **Costs:** one base-tier CNC buy per symbol, paid from its Rs 500: shoonya (zero
+  brokerage) plus STT, stamp, exchange charge, SEBI fee and GST. After costs the
+  benchmark is worth Rs 19,738 at the first close.
+- **Holding:** to the 2023-12-29 close, never rebalanced, marked at each close.
+- **No sell costs.** Swing's final equity includes the Rs 137.91 of charges and
+  slippage on its 4 end-of-run sales.
+
+**Read with the numbers:**
+
+- **2016:** swing held nothing until 2016-11-01 (the 200-session average needs ten
+  months of data). The benchmark was invested from 2016-01-04.
+- **Universe:** both use the same survivorship-biased universe (today's large caps).
+- **ADANIENT:**
+  - It rose 31.9x from the first open to the last close, the most of the 40 (median
+    2.97x).
+  - It is 17.8% of the benchmark's final value.
+- **Dividends:** neither side adds dividend cash. The prices are the data/clean prices
+  (split/bonus adjusted by the source, `docs/data.md`).
+- **Definitions:**
+  - Return for a year is the change in session-end equity over the previous year's last
+    equity; 2016 is over Rs 20,000. "All" is over the whole period from Rs 20,000.
+  - Max DD % is the largest fall from a running peak, as % of that peak. Within a year
+    the peak starts at the year's opening equity.
+  - Excess return = swing return minus benchmark return, in percentage points (not
+    compounded).
+
+| Year | Swing return % | Swing max DD % | Benchmark return % | Benchmark max DD % | Swing excess return, pp |
+|---|---|---|---|---|---|
+| 2016 | -8.8% | 12.4% | 10.5% | 12.3% | -19.4 |
+| 2017 | 24.4% | 12.1% | 45.0% | 5.8% | -20.6 |
+| 2018 | -20.4% | 26.8% | -0.3% | 15.4% | -20.1 |
+| 2019 | 8.7% | 21.6% | 14.3% | 13.6% | -5.6 |
+| 2020 | 2.5% | 42.7% | 21.2% | 40.6% | -18.8 |
+| 2021 | 66.0% | 19.0% | 52.2% | 10.7% | +13.8 |
+| 2022 | 3.8% | 23.7% | 18.4% | 18.0% | -14.7 |
+| 2023 | 8.3% | 15.6% | 11.5% | 23.2% | -3.2 |
+| All, 2016-2023 | 87.8% | 48.0% | 345.6% | 40.6% | -257.8 |
+
+Final equity: swing Rs 37,552, benchmark Rs 89,114.
+
+**Swing with the ADANIENT trades removed.**
+
+- **Method:** each session's equity minus ADANIENT's contribution. That contribution is
+  its fills' cash flows (with their charges and slippage) plus the shares held at that
+  session's close.
+- **Not a run without ADANIENT:**
+  - every other trade is unchanged, including sizes set off an account that held
+    ADANIENT's gains;
+  - the slot ADANIENT held was not given to another stock.
+- **Overall:** net Rs 6,640, +33.2% over the period (+87.8% with ADANIENT). This equals
+  the net P&L of the other 133 trades in `trades.parquet` (Rs 6,639.54 both ways).
+
+| Year | Swing ex-ADANIENT return % | Swing ex-ADANIENT max DD % | Benchmark return % | Excess return, pp |
+|---|---|---|---|---|
+| 2016 | -8.8% | 12.4% | 10.5% | -19.4 |
+| 2017 | 22.6% | 9.6% | 45.0% | -22.4 |
+| 2018 | -12.8% | 19.7% | -0.3% | -12.6 |
+| 2019 | 12.0% | 19.7% | 14.3% | -2.4 |
+| 2020 | 2.0% | 27.5% | 21.2% | -19.3 |
+| 2021 | 9.7% | 22.7% | 52.2% | -42.5 |
+| 2022 | -13.0% | 29.2% | 18.4% | -31.4 |
+| 2023 | 25.4% | 13.8% | 11.5% | +13.8 |
+| All, 2016-2023 | 33.2% | 36.0% | 345.6% | -312.4 |
+
+The benchmark keeps ADANIENT in this table.
+
+Reproduce sections 6 and 7:
+
+- `scripts/report_runs.py summary` and `detail` on the run directories of trials 12-13
+  (`research/runs/20261027-200639_swing_dev_base`,
+  `research/runs/20261027-200650_swing_dev_stress1`);
+- `uv run python scripts/report_runs.py benchmark research/runs/20261027-200639_swing_dev_base --exclude ADANIENT`.
 
 Status: no decision recorded. The owner decides.
