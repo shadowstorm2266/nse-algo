@@ -28,7 +28,8 @@ IMPORTANT: This code will eventually place real orders with real money. Correctn
 
 ## Promotion gates
 
-- **Gate A, backtest → paper:** ≥300 dev-period trades (≥100 for swing); net expectancy > 0 at double the modeled slippage; walk-forward out-of-sample net expectancy > 0 and profit factor ≥ 1.15; parameter neighbours keep ≥50% of the chosen setting's net expectancy; Deflated Sharpe ≥ 0.90; holdout net positive (run once); P(15% drawdown within 250 trading days) < 10% at configured risk.
+- **Gate A, backtest → paper:** ≥300 dev-period trades (≥100 for swing); net expectancy > 0 at double the modeled slippage; long-only strategies beat an equal-weight buy-and-hold of the same universe after costs, overall and in most years of dev; walk-forward out-of-sample net expectancy > 0 and profit factor ≥ 1.15; parameter neighbours keep ≥50% of the chosen setting's net expectancy; Deflated Sharpe ≥ 0.90; holdout net positive (run once); P(15% drawdown within 250 trading days) < 10% at configured risk.
+  - Every long-only result includes the benchmark report: `uv run python scripts/report_runs.py benchmark RUN_DIR`.
 - **Gate B, paper → live:** ≥30 sessions and ≥40 trades; zero unhandled exceptions in the last 10 sessions; flat by 14:50 every day; paper slippage within modeled + 2 bps per side; paper P&L inside the backtest's 5th–95th percentile band for the same trade count; crash-recovery and /kill drills passed.
 - **Gate C, small live → standard risk:** ≥50 live trades; live slippage ≤ modeled; results inside the backtest band; no risk-limit breach.
 

@@ -486,4 +486,15 @@ Reproduce sections 6 and 7:
   `research/runs/20261027-200650_swing_dev_stress1`);
 - `uv run python scripts/report_runs.py benchmark research/runs/20261027-200639_swing_dev_base --exclude ADANIENT`.
 
-Status: no decision recorded. The owner decides.
+**Engine changes after trials 12-13 (owner's decision, 2026-10-27; no trial rerun):**
+
+- The broker's cash check for a CNC buy uses real cash (`Portfolio.cash`). Unrealized
+  losses on delivery holdings no longer reduce it; MIS free margin is unchanged. The old
+  rule caused the first table of cash rejections in section 6.
+- A buy sized by the gross room is treated like one sized by its slot: the room less its
+  estimated buy charges, at 99%. The old rule (all of the room, no allowance) caused the
+  second table.
+- Trials 12-13 ran before these changes. Every number in sections 6 and 7 is under the
+  old rules.
+
+Status: loses to equal-weight buy-and-hold of the same universe; parked.
