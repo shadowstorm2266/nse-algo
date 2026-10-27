@@ -140,6 +140,7 @@ def test_cli_swing_writes_fills_and_warns_when_the_index_is_missing(paths, capsy
     assert "'NIFTY 50'" in warning and "no bars" in warning and "whole run" in warning
     assert f"WARNING: {warning}" in capsys.readouterr().out
     assert (Path(trial["run_dir"]) / "fills.parquet").is_file()
+    assert trial["sizing_basis"] == trial["metrics"]["sizing_basis"] == "current_equity"
 
 
 def test_cli_loads_a_present_index_without_trading_it(paths):

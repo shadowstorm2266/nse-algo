@@ -30,7 +30,9 @@ LEVELS = {
     "C": (100, 100, 105, 200, 200, 200),
     "D": (100, 100, 110, 110, 110, 110),
 }
-APR30, MAY1, MAY2, MAY31, JUN3, JUN28 = (
+APR26, APR29, APR30, MAY1, MAY2, MAY31, JUN3, JUN28 = (
+    date(2024, 4, 26),
+    date(2024, 4, 29),
     date(2024, 4, 30),
     date(2024, 5, 1),
     date(2024, 5, 2),
@@ -83,7 +85,7 @@ def decisions(result) -> dict[pd.Timestamp, list[tuple[str, str, int | None]]]:
 
 def test_yaml_defaults_and_registry():
     s = make_strategy("swing", load_strategy_params("swing", {}))
-    assert isinstance(s, SwingMomentumStrategy) and s.name == "swing" and s.version == "1"
+    assert isinstance(s, SwingMomentumStrategy) and s.name == "swing" and s.version == "2"
     assert s.params() == {
         "top_n": 4,
         "lookback_months": 6,
@@ -150,10 +152,10 @@ def test_ranks_by_return_skipping_the_latest_month_and_swaps_only_dropouts():
         ts(JUN28, "09:15"),
         "end_of_run",
     )
-    # A: ref = 30 Apr close 90 x 1.0021; slot (20000 - 23.76) / 4 = 4994.06 -> 55 shares,
-    # filled at the 1 May open 90.00 + 3 bps.
-    assert a.qty == 55 and float(a.entry_price) == pytest.approx(90.027)
-    assert b.qty == 38  # floor(4994.06 / (130 x 1.0021)); kept as it is to the end
+    # A: ref = 30 Apr close 90 x 1.0021; 99% of the slot (20000 - 23.76) / 4 = 4944.12
+    # -> 54 shares, filled at the 1 May open 90.00 + 3 bps.
+    assert a.qty == 54 and float(a.entry_price) == pytest.approx(90.027)
+    assert b.qty == 37  # floor(4944.12 / (130 x 1.0021)); kept as it is to the end
 
 
 def test_every_sale_pays_the_dp_charge():
@@ -185,6 +187,17 @@ def test_orders_fill_at_the_next_tradeable_open():
     a = next(t for t in bt.portfolio.trades if t.symbol == "A")
     assert a.entry_time == ts(MAY2, "09:15")
     assert float(a.entry_price) == pytest.approx(90 * (1 + 1e-4) * 1.0003)  # 2 May open
+
+
+@pytest.mark.parametrize(("no_trade", "decided"), [((APR30,), APR29), ((APR29, APR30), APR26)])
+def test_a_month_ending_on_no_trade_days_decides_on_its_last_tradeable_session(no_trade, decided):
+    result, bt = run(small(), universe_bars(), no_trade=no_trade)
+    assert decisions(result) == {  # nothing on the no_trade days themselves
+        ts(decided, "15:30"): [("ENTRY", "A", 1), ("ENTRY", "B", 2)],
+        ts(MAY31, "15:30"): [("EXIT", "A", None), ("ENTRY", "C", 1)],
+    }
+    a = next(t for t in bt.portfolio.trades if t.symbol == "A")
+    assert a.entry_time == ts(MAY1, "09:15")  # the next tradeable open
 
 
 def test_one_share_above_the_cap_is_skipped_and_its_slot_stays_cash():

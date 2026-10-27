@@ -1,8 +1,9 @@
 """Strategy 2: monthly momentum, swing (CNC delivery, daily bars).
 
-Decides after the close of the last session of each month M (the calendar's next session
-is in another month), using data up to that close; the RiskGovernor turns the intents
-into market orders for the next tradeable session's open.
+Decides after the close of the last tradeable session of each month M (the calendar's
+next tradeable session is in another month), using data up to that close: a month whose
+last session is no_trade decides on the last tradeable session before it. The
+RiskGovernor turns the intents into market orders for the next tradeable session's open.
 
 - Momentum: close at the end of month M - skip over the close at the end of month
   M - skip - lookback, minus 1 (6 months, skipping the latest month, by default). A
@@ -77,10 +78,13 @@ def month_index(d: date) -> int:
 
 
 def is_month_end(ctx: StrategyContext) -> bool:
-    """The last session of its month: the calendar's next session is in another month.
-    False after the calendar's last session (nothing could fill)."""
-    nxt = ctx.next_session
-    return nxt is not None and month_index(nxt) != month_index(ctx.session_date)
+    """The last tradeable session of its month: today is not no_trade and the calendar's
+    next tradeable session is in another month. False when no tradeable session follows
+    (nothing could fill)."""
+    nxt = ctx.next_tradeable_session
+    if ctx.session_no_trade or nxt is None:
+        return False
+    return month_index(nxt) != month_index(ctx.session_date)
 
 
 def month_end_close(months: np.ndarray, close: np.ndarray, month: int) -> float | None:
@@ -98,7 +102,9 @@ def above_average(bars: BarView, sessions: int) -> bool:
 
 class SwingMomentumStrategy:
     name = "swing"
-    version = "1"  # bump on any logic change or change of a default in swing.yaml
+    # bump on any logic change or change of a default in swing.yaml
+    # 2: a month ending on no_trade sessions decides on its last tradeable session
+    version = "2"
     product = Product.CNC
     timeframe = "1d"
 

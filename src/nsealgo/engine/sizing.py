@@ -61,18 +61,21 @@ def swing_qty(
     equity: Decimal,
     est_buy_charges: Decimal,
     max_positions: int,
+    cash_buffer_pct: Decimal,
     position_cap: Decimal,
     remaining_gross: Decimal,
 ) -> SwingSize:
-    """Equal-weight shares: slot = (equity - estimated buy charges) / max_positions.
+    """Equal-weight shares: slot = (equity - estimated buy charges) / max_positions,
+    of which (100 - cash_buffer_pct)% is spent (the rest absorbs an opening gap).
 
-    If the slot buys no whole share but one share fits the position cap (and the
-    gross cap), buy one. If one share is above the position cap, skip the stock.
+    If that buys no whole share but one share fits the position cap (and the gross
+    cap), buy one. If one share is above the position cap, skip the stock. The caps
+    are not reduced by the buffer.
     """
     if price > position_cap:
         detail = f"1 share at {price:.2f} > position cap {position_cap:.2f}"
         return SwingSize(0, RejectReason.PRICE_ABOVE_POSITION_CAP, detail)
-    slot = (equity - est_buy_charges) / max_positions
+    slot = (equity - est_buy_charges) / max_positions * (1 - cash_buffer_pct / 100)
     by_slot = floor_shares(slot, price)
     by_cap = floor_shares(position_cap, price)
     by_gross = floor_shares(remaining_gross, price)

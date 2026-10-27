@@ -3,7 +3,8 @@
 Only bars with available_at <= now, the session's daily features (available_at
 09:15), open positions, working orders and today's fills. Arrays are read-only
 views; nothing here does I/O or reads a clock. `next_session` is the next date on the
-trading calendar (tradeable or not), which the exchange holiday list gives in advance.
+trading calendar (tradeable or not), which the exchange holiday list gives in advance;
+`next_tradeable_session` is the next one not marked no_trade.
 """
 
 from collections.abc import Iterator, Mapping
@@ -73,6 +74,7 @@ class StrategyContext:
     session_date: date
     session_no_trade: bool
     next_session: date | None  # None after the calendar's last session
+    next_tradeable_session: date | None  # skips no_trade sessions; None if none is left
     symbols: tuple[str, ...]
     positions: Mapping[str, PositionView]
     working_orders: tuple[OrderView, ...]

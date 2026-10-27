@@ -1,5 +1,6 @@
-"""Sizing basis: backtests size every session off the fixed `capital` (no compounding);
-paper and live size off current equity. Drawdown halt and daily loss use real equity."""
+"""Sizing basis: MIS backtests size every session off the fixed `capital` (no
+compounding); CNC backtests, paper and live size off current equity. Drawdown halt and
+daily loss use real equity."""
 
 import math
 from decimal import Decimal
@@ -29,6 +30,7 @@ from tests.data_helpers import business_days
 from tests.engine_helpers import (
     ScriptedStrategy,
     cost_config,
+    daily_frame,
     entry,
     make_fill,
     margins,
@@ -42,7 +44,9 @@ from tests.engine_helpers import (
 D = Decimal
 DAYS = business_days("2024-01-01", 10)
 DAY, DAY2 = DAYS[1], DAYS[2]
-CURRENT = {"backtest": "current_equity", "paper": "current_equity", "live": "current_equity"}
+LIVE_LIKE = {"paper": "current_equity", "live": "current_equity"}
+CURRENT = {"backtest": {"mis": "current_equity", "cnc": "current_equity"}, **LIVE_LIKE}
+FIXED = {"backtest": {"mis": "fixed_capital", "cnc": "fixed_capital"}, **LIVE_LIKE}
 DRAINED_TODAY_UP = {"equity": "10000", "start": "9000", "peak": "20000"}
 
 
@@ -67,15 +71,19 @@ def qty(g: RiskGovernor, intent, hhmm: str = "10:00", **snap_kw) -> int | Reject
 # --- config ---
 
 
-def test_backtests_fixed_capital_paper_and_live_current_equity():
+def test_backtests_mis_fixed_capital_cnc_paper_and_live_current_equity():
     sb = risk_config().sizing_basis
-    assert (sb.backtest, sb.paper, sb.live) == ("fixed_capital", "current_equity", "current_equity")
+    assert (sb.backtest.mis, sb.backtest.cnc) == ("fixed_capital", "current_equity")
+    assert (sb.paper, sb.live) == ("current_equity", "current_equity")
     assert gov(Product.MIS).sizing_basis == "fixed_capital"
+    assert gov(Product.CNC).sizing_basis == "current_equity"
     assert gov(Product.MIS, mode="paper").sizing_basis == "current_equity"
     assert gov(Product.CNC, mode="live").sizing_basis == "current_equity"
     for mode in ("paper", "live"):
         with pytest.raises(ValidationError):
             risk_config(sizing_basis={**CURRENT, mode: "fixed_capital"})
+    with pytest.raises(ValidationError):  # the backtest basis is per product
+        risk_config(sizing_basis={**CURRENT, "backtest": "current_equity"})
 
 
 # --- RiskGovernor: MIS ---
@@ -105,10 +113,28 @@ def test_mis_fixed_capital_keeps_the_sessions_own_pnl():
 SWING_BUY = entry("Y", Side.BUY, product=Product.CNC)
 
 
+GROWN = {"equity": "30000", "start": "29000", "peak": "30000"}
+DOWN_10_PCT = {"equity": "18000", "start": "18500", "peak": "20000"}  # under the 15% halt
+
+
+def test_cnc_backtests_size_off_current_equity_like_paper():
+    backtest, paper = gov(Product.CNC), gov(Product.CNC, mode="paper")
+    for kw in ({}, DOWN_10_PCT, GROWN):
+        assert qty(backtest, SWING_BUY, "15:30", **kw) == qty(paper, SWING_BUY, "15:30", **kw)
+    assert qty(backtest, SWING_BUY, "15:30") == 49  # 99% of (20000 - 23.76) / 4 = 4944.12
+    assert qty(backtest, SWING_BUY, "15:30", **DOWN_10_PCT) == 44  # 99% of 4494.67
+    # Past the halt, paper latches; a backtest records the halt and keeps sizing.
+    assert qty(backtest, SWING_BUY, "15:30", **DRAINED_TODAY_UP) == 24  # 99% of 2497.04
+    assert qty(backtest, SWING_BUY, "15:30", **GROWN) == 74  # 99% of 7491.10
+    # MIS backtests still size off the fixed capital.
+    mis = gov(Product.MIS, max_gross_exposure_rupees=200000)
+    assert qty(mis, MARGIN_BOUND, equity="1000", peak="20000") == 800
+
+
 def test_cnc_fixed_capital_sizes_off_capital_exactly():
-    g = gov(Product.CNC)
+    g = gov(Product.CNC, sizing_basis=FIXED)
     fresh = qty(g, SWING_BUY, "15:30")
-    assert fresh == 49  # slot (20000 - est. charges) / 4 at 100
+    assert fresh == 49  # 99% of the slot (20000 - est. charges) / 4, at 100
     # Decided after the close for the next open: today's P&L is not carried either.
     assert qty(g, SWING_BUY, "15:30", **DRAINED_TODAY_UP) == fresh
     assert qty(g, SWING_BUY, "15:30", equity="21000", start="20000", peak="21000") == fresh
@@ -175,6 +201,28 @@ def test_backtester_day_two_size(basis, day2_qty):
     eq = result.equity["equity"].tolist()
     assert eq[0] == pytest.approx(20000 + float(first.net_pnl))
     assert eq[1] == pytest.approx(eq[0] + float(second.net_pnl))
+
+
+@pytest.mark.parametrize(("basis", "b_qty"), [(None, 61), ("fixed", 49)])
+def test_cnc_backtest_sizes_the_next_buy_off_the_grown_account(basis, b_qty):
+    d0, d1, d2 = DAYS[:3]
+    a = daily_frame("A", {d0: (100, 101, 99, 100), d1: (100, 201, 99, 200), d2: (200,) * 4})
+    b = daily_frame("B", {d: (100, 101, 99, 100) for d in (d0, d1, d2)})
+    buy = {"product": Product.CNC, "rank": 1}
+    script = {
+        ts(d0, "15:30"): [entry("A", Side.BUY, **buy)],
+        ts(d1, "15:30"): [entry("B", Side.BUY, **buy)],
+    }
+    overrides = {"sizing_basis": FIXED} if basis == "fixed" else {}
+    result, bt = run_frames(
+        ScriptedStrategy(Product.CNC, "1d", script), pd.concat([a, b]), [d0, d1, d2], **overrides
+    )
+    a_trade, b_trade = sorted(bt.portfolio.trades, key=lambda t: t.symbol)
+    assert a_trade.qty == 49  # 99% of (20000 - 23.76) / 4, at 100
+    # A doubled on d1: equity ~24,893, so the current-equity slot is 99% of ~6,215.8.
+    assert result.equity["equity"].iloc[1] == pytest.approx(24892.7, abs=0.1)
+    assert b_trade.qty == b_qty
+    assert bt.portfolio.sizing == ("fixed_capital" if basis == "fixed" else "current_equity")
 
 
 # --- metrics ---

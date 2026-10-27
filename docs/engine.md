@@ -41,7 +41,8 @@ The loop walks bar groups (all symbols' bars that start at the same time):
 
 The context also carries `next_session`, the next date on the trading calendar
 (tradeable or not; None after the last), which the exchange holiday list gives in
-advance. A monthly strategy uses it to know it is on the last session of a month.
+advance, and `next_tradeable_session`, the next one not marked no_trade. The monthly
+swing strategy uses the latter to know it is on the last tradeable session of a month.
 
 So a signal on bar T fills at bar T+1's open at the earliest. A fill inside bar T+1
 becomes visible at T+1's `available_at`. Daily bars have `ts` 09:15 and `available_at`
@@ -107,25 +108,29 @@ no entry window, no flat_by, no per-trade rupee risk and no daily loss stop.
 - Checks: `SWING_DISABLED`, `SHORT_NOT_ALLOWED`, `INVALID_INTENT` (any price, stop,
   target or group), `MAX_ORDERS_PER_DAY`, `POSITION_EXISTS`, `MAX_POSITIONS`,
   `NO_NEXT_SESSION`, `NO_PRICE`, sizing.
-- Sizing: slot = (equity - estimated buy charges) / max_positions, then qty =
-  min(slot, 30% of equity, gross left under 100% of equity) / price in whole shares.
-  "Equity" here is the sizing equity (see the sizing basis below).
-- If the slot buys no share but one share fits the caps, the qty is 1. If one share
+- Sizing: slot = (equity - estimated buy charges) / max_positions, of which
+  (100 - `cash_buffer_pct`)% is spent (99%: the rest absorbs a normal opening gap plus
+  costs, so the buy is not rejected for cash). qty = min(that, 30% of equity, gross
+  left under 100% of equity) / price in whole shares; the buffer does not reduce the
+  caps. "Equity" here is the sizing equity (see the sizing basis below).
+- If the buffered slot buys no share but one share fits the caps, the qty is 1. If one share
   is above 30% of equity, the stock is skipped (`PRICE_ABOVE_POSITION_CAP`, logged with
   price and rank) and review continues with the next rank.
 - Intents are reviewed exits first, then entries by `rank`. A position with a
   working full exit frees its slot.
 - Orders skip no_trade sessions: they fill at the next tradeable open.
 
-**Sizing basis** (`sizing_basis` in `risk.yaml`, per run mode). `current_equity` sizes
-from the account as it stands, so sizes compound; paper and live must use it.
-`fixed_capital` (the backtest default) sizes every session off `capital`, so a
-drawdown never shrinks later trades and every year of a research period is tested at
-the configured size. MIS: free margin is computed on the account rebased to `capital`
-at the session open, so the session's own P&L still counts. CNC: decisions after the
-close size off `capital` exactly, and the broker's cash check at the next open uses
-the same rebased account (`Portfolio.buying_power`). Equity, the drawdown halt, the
-daily loss limit and every trade record use the real, cumulative account.
+**Sizing basis** (`sizing_basis` in `risk.yaml`, per run mode; backtests per product).
+`current_equity` sizes from the account as it stands, so sizes compound; paper and
+live must use it, and CNC backtests use it too (`backtest.cnc`), so swing research
+sizes as paper and live would. `fixed_capital` (`backtest.mis`) sizes every session
+off `capital`, so a drawdown never shrinks later trades and every year of a research
+period is tested at the configured size. MIS: free margin is computed on the account
+rebased to `capital` at the session open, so the session's own P&L still counts. CNC
+with `fixed_capital` (configurable, not the default): decisions after the close size
+off `capital` exactly, and the broker's cash check at the next open uses the same
+rebased account (`Portfolio.buying_power`). Equity, the drawdown halt, the daily loss
+limit and every trade record use the real, cumulative account.
 
 **Exits** reducing a real position are always allowed (`NO_POSITION`,
 `DUPLICATE_EXIT` and `INVALID_INTENT` otherwise), even under KILL or a latched halt.
@@ -177,6 +182,19 @@ one row per run, `detail` for one run by year, side, exit reason and symbol, plu
 turnover and costs by the year of each fill, holding periods, position-cap skips and
 rejections). Turnover is one-way: (bought + sold) / 2 / capital.
 
+`report_runs.py benchmark RUN_DIR [--exclude SYM,...]` compares a run with an
+equal-weight buy-and-hold of its universe (`reporting/benchmark.py`): each symbol gets
+capital / n, bought in fractional shares at the first session's open with one
+base-tier buy (charges of the active brokerage preset plus base slippage), held to the
+period's last close, no rebalancing and no sell costs. By calendar year (in-year) and
+over the whole period: return, max drawdown and the run's excess return (run minus
+benchmark, percentage points). `--exclude` takes those symbols' trades out of the run:
+each session's equity minus their fills' cash flows (sales add value, buys subtract
+it, every fill pays its charges) and their holdings at the close; other trades are
+unchanged, including sizes set off an account that held them. The benchmark is not a
+strategy and not a trial; it reads daily bars from data/clean, never on or after
+`holdout_start`.
+
 ## Metrics
 
 Per round trip (partial exits summed):
@@ -212,7 +230,9 @@ re-checks that no session on or after `holdout_start` is read without permission
 - Charges are per order, not per contract note. Each leg's components are rounded
   separately.
 - Universe membership is not point-in-time (see `config/universe.yaml`).
-- The calendar is known in advance: `next_session` in the context, and `no_trade` flags
-  (outage days). Swing orders deferred past an outage day use that knowledge; in
-  reality the outage was only known on the day.
+- The calendar is known in advance: `next_session` and `next_tradeable_session` in the
+  context, and `no_trade` flags (outage days). Swing orders deferred past an outage day
+  use that knowledge, and so would a month-end swing decision moved to the session
+  before a month-end outage (none in dev); in reality the outage was only known on the
+  day.
 - 15m bars cannot run MIS: 14:50 is not on the 15m grid.

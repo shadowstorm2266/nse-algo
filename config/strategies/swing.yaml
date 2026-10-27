@@ -6,8 +6,9 @@
 # max_positions (4) and the sizing basis belong to config/risk.yaml (swing block) and are
 # enforced by the RiskGovernor, not here.
 #
-# Decision after the close of the last session of each month (M), using data up to that
-# close; orders fill at the next tradeable session's open.
+# Decision after the close of the last tradeable session of each month (M), using data up
+# to that close (a month whose last session is no_trade decides on the last tradeable
+# session before it); orders fill at the next tradeable session's open.
 
 top_n: 4                # hold the top N by momentum
 lookback_months: 6      # momentum = close at the end of month M-skip over the close at the

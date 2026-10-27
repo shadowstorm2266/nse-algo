@@ -183,7 +183,7 @@ def test_swing_decision_fills_next_open_and_skips_no_trade_days():
     )
     result, bt = run_frames(strat, bars, [D0, D1, D2, D3, D4], no_trade=(D2,))
     (trade,) = bt.portfolio.trades
-    assert trade.qty == 49  # floor(((20000 - 23.76) / 4) / 100)
+    assert trade.qty == 49  # floor(0.99 x ((20000 - 23.76) / 4) / 100)
     assert (trade.entry_time, trade.exit_time) == (ts(D1, "09:15"), ts(D3, "09:15"))
     assert trade.exit_reason == "strategy"
     assert len(strat.seen[1].bars("A")) == 2  # D0 and D1 visible at D1 15:30
@@ -194,12 +194,30 @@ def test_context_next_session_is_the_next_calendar_session():
     # The calendar (exchange holiday list) is known in advance; no_trade days are sessions.
     strat = ScriptedStrategy(CNC, "1d", {})
     run_frames(strat, _daily("A", 100.0, days=(D0, D1, D2, D3)), [D0, D1, D2, D3], no_trade=(D2,))
-    assert [(c.session_date, c.next_session) for c in strat.seen] == [
-        (D0, D1),
-        (D1, D2),
-        (D2, D3),
-        (D3, None),
+    assert [(c.session_date, c.next_session, c.next_tradeable_session) for c in strat.seen] == [
+        (D0, D1, D1),
+        (D1, D2, D3),
+        (D2, D3, D3),
+        (D3, None, None),
     ]
+
+
+@pytest.mark.parametrize(("buffer_pct", "rejected"), [(1, []), (0, ["D"])])
+def test_cash_buffer_absorbs_a_one_pct_opening_gap(buffer_pct, rejected):
+    # Four buys at a 50 close fill the account; the next open gaps up 1% to 50.5.
+    # Without the buffer: 99 shares each, ~5,007 with slippage and charges, so the
+    # fourth buy is short of cash. With 1%: 98 shares each, ~4,956.
+    names = ("A", "B", "C", "D")
+    rows = {D0: (50, 51, 49, 50), D1: (50.5, 51, 50, 50.5), D2: (50.5, 51, 50, 50.5)}
+    bars = pd.concat([daily_frame(s, rows) for s in names], ignore_index=True)
+    buys = [entry(s, Side.BUY, product=CNC, rank=i) for i, s in enumerate(names, start=1)]
+    strat = ScriptedStrategy(CNC, "1d", {ts(D0, "15:30"): buys})
+    result, bt = run_frames(strat, bars, [D0, D1, D2], swing={"cash_buffer_pct": buffer_pct})
+    cash = result.rejections[result.rejections["reason"] == "INSUFFICIENT_CASH"]
+    assert list(cash["symbol"]) == rejected
+    qty = 98 if buffer_pct else 99
+    assert {t.qty for t in bt.portfolio.trades} == {qty}
+    assert len(bt.portfolio.trades) == 4 - len(rejected)
 
 
 def test_fills_frame_has_every_fill_with_charges_slippage_and_dp():

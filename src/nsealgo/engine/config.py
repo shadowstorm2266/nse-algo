@@ -10,6 +10,7 @@ from typing import Any, Literal
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from nsealgo.engine.types import Product
 from nsealgo.settings import REPO_ROOT, Mode
 
 RISK_CONFIG_PATH = REPO_ROOT / "config" / "risk.yaml"
@@ -36,18 +37,30 @@ class HaltModes(BaseModel):
 SizingBasis = Literal["current_equity", "fixed_capital"]
 
 
-class SizingBases(BaseModel):
-    """Which equity the RiskGovernor sizes from. `current_equity`: the account as it
-    stands (compounding). `fixed_capital`: every session sizes off `capital`, no
-    compounding; research only. Paper and live must use current equity."""
+class BacktestSizing(BaseModel):
+    """The backtest sizing basis per product (a run trades one product)."""
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
-    backtest: SizingBasis
+    mis: SizingBasis
+    cnc: SizingBasis
+
+
+class SizingBases(BaseModel):
+    """Which equity the RiskGovernor sizes from. `current_equity`: the account as it
+    stands (compounding). `fixed_capital`: every session sizes off `capital`, no
+    compounding; research only. Backtests choose per product; paper and live must use
+    current equity."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    backtest: BacktestSizing
     paper: Literal["current_equity"]
     live: Literal["current_equity"]
 
-    def for_mode(self, mode: Mode) -> SizingBasis:
+    def for_mode(self, mode: Mode, product: Product) -> SizingBasis:
+        if mode == "backtest":
+            return self.backtest.mis if product is Product.MIS else self.backtest.cnc
         return getattr(self, mode)
 
 
@@ -59,6 +72,7 @@ class SwingConfig(BaseModel):
     max_position_pct: Decimal = Field(gt=0, le=100)
     max_gross_exposure_pct: Decimal = Field(gt=0, le=100)
     max_orders_per_day: int = Field(gt=0)
+    cash_buffer_pct: Decimal = Field(ge=0, lt=100)  # buys use (100 - this)% of a slot
 
 
 class RiskConfig(BaseModel):

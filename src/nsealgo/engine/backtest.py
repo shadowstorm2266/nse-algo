@@ -115,7 +115,7 @@ class Backtester:
         self.strategy = strategy
         self.universe = tuple(universe)
         self.calendar = calendar
-        sizing = risk_config.sizing_basis.for_mode(mode)
+        sizing = risk_config.sizing_basis.for_mode(mode, strategy.product)
         self.portfolio = Portfolio(risk_config.capital, margins, sizing)
         self.broker = SimBroker(
             costs,
@@ -260,6 +260,7 @@ class Backtester:
             session_date=sl.day,
             session_no_trade=self.calendar.is_no_trade(sl.day),
             next_session=self.calendar.next_session_after(sl.day),
+            next_tradeable_session=self.calendar.next_tradeable_after(sl.day),
             symbols=self.universe,
             positions=self.portfolio.position_views(),
             working_orders=tuple(

@@ -1,6 +1,7 @@
 from decimal import Decimal
 
 import pytest
+from pydantic import ValidationError
 
 from nsealgo.costs import fill_charges
 from nsealgo.engine.risk import RiskGovernor
@@ -66,17 +67,29 @@ def test_equal_weight_slot_after_estimated_buy_charges():
     assert est == D("23.76")  # 4 x 5.94
     order = review(governor(), buy())
     assert isinstance(order, Order)
-    assert order.qty == 49  # floor(((20000 - 23.76) / 4) / 100) = floor(49.94)
+    assert order.qty == 49  # floor(0.99 x ((20000 - 23.76) / 4) / 100) = floor(49.44)
     assert (order.order_type, order.role, order.rank) == (OrderType.MARKET, OrderRole.ENTRY, 1)
     assert order.not_before == DAYS[1]  # the next session's open
     assert order.expires_at == session_close(DAYS[1])
 
 
-def test_slot_uses_current_equity_in_paper_and_capital_in_backtests():
-    # Buy charges on 6000 are 7.12, so the slot is (24000 - 4 x 7.12) / 4 = 5992.88.
+def test_slot_uses_current_equity_in_backtests_and_paper():
+    # Buy charges on 6000 are 7.12, so the slot is (24000 - 4 x 7.12) / 4 = 5992.88,
+    # sized at 99% (5932.95). CNC backtests size like paper (sizing_basis.backtest.cnc).
     assert review(governor(mode="paper"), buy(), equity="24000").qty == 59
-    # Backtests size off the fixed 20000 capital (sizing_basis.backtest: fixed_capital).
-    assert review(governor(), buy(), equity="24000").qty == 49
+    assert review(governor(), buy(), equity="24000").qty == 59
+
+
+def test_cash_buffer_sizes_each_buy_at_99_pct_of_its_slot():
+    assert risk_config().swing.cash_buffer_pct == D(1)
+    # Slot (20000 - 23.76) / 4 = 4994.06; 99% of it is 4944.12.
+    assert review(governor(), buy(), marks={"A": 50.0}).qty == 98  # floor(98.88)
+    assert review(governor(cash_buffer_pct=0), buy(), marks={"A": 50.0}).qty == 99  # 99.88
+    # The caps are not reduced: one share still fits up to 30% of equity.
+    assert review(governor(), buy(), marks={"A": 5990.0}).qty == 1
+    for bad in (-1, 100):
+        with pytest.raises(ValidationError):
+            governor(cash_buffer_pct=bad)
 
 
 def test_one_share_when_the_slot_buys_none_but_it_fits_the_cap():
