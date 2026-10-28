@@ -336,3 +336,11 @@ The exit split is computed this way:
    average. Otherwise it is a 10-session exit.
 
 No time exit had fewer than 10 sessions held. No 5-average exit had more than 10.
+
+## Decision
+
+Owner's decision, 2026-10-28: fails Gate A, parked. No fixed-capital run: the reference
+tier (no brokerage, no slippage) already loses (-7.6 bps/trade, trial 14), so the signal
+fails before the shrinking account matters.
+
+Status: fails Gate A, parked.

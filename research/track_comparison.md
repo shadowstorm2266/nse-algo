@@ -122,7 +122,8 @@ Final equity: swing Rs 37,552, benchmark Rs 89,114.
 | Holdout | net positive, once | not run | not run |
 | P(15% DD within 250 days) | < 10% | not computed | not computed |
 
-The DSR trial count is 13 (7 ORB, 6 swing).
+The DSR trial count was 13 (7 ORB, 6 swing) when these tables were made. It is now 17,
+with pullback trials 14-17.
 
 ## Caveats that differ between the tracks
 
@@ -155,3 +156,7 @@ The DSR trial count is 13 (7 ORB, 6 swing).
 - ORB v1: "fails Gate A, parked" (owner's decision, 2026-10-27).
 - Swing momentum v1 and v2: "loses to equal-weight buy-and-hold of the same universe;
   parked" (owner's decision, 2026-10-27).
+- Pullback mean reversion v1 (strategy 3, swing track, trials 14-17): "fails Gate A,
+  parked" (owner's decision, 2026-10-28). No fixed-capital run: the reference tier (no
+  brokerage, no slippage) already loses, -7.6 bps/trade (trial 14). Not in the tables
+  above; details in `research/strategy3_result.md`.
