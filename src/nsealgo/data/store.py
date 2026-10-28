@@ -5,9 +5,11 @@ Layout (hive partitions; partition columns are not stored inside the files):
     daily/features/symbol=X/part-0.parquet
     daily/rvol/symbol=X/part-0.parquet
     calendar/calendar.parquet
+    etf_proxy/bars.parquet  (scripts/build_etf_proxy.py; daily, one file)
 
 Views: bars_1m, bars_5m, bars_15m, daily_features, rvol_profile, calendar,
-bars_5m_rvol (5m bars joined to their prior-20-session bucket average).
+bars_5m_rvol (5m bars joined to their prior-20-session bucket average), and
+etf_proxy_1d when the ETF proxy dataset has been built.
 Timestamps are TIMESTAMPTZ; the connection's TimeZone is Asia/Kolkata.
 """
 
@@ -21,6 +23,7 @@ from nsealgo.settings import REPO_ROOT
 CLEAN_DIR = REPO_ROOT / "data" / "clean"
 TIMEFRAMES = ("1m", "5m", "15m")
 PART = "part-0.parquet"
+ETF_PROXY_FILE = Path("etf_proxy") / "bars.parquet"
 
 
 def write_bars(bars: pd.DataFrame, clean_dir: Path, timeframe: str) -> None:
@@ -47,6 +50,14 @@ def write_calendar(calendar: pd.DataFrame, clean_dir: Path) -> None:
     out = clean_dir / "calendar"
     out.mkdir(parents=True, exist_ok=True)
     calendar.to_parquet(out / "calendar.parquet", index=False)
+
+
+def write_etf_proxy(bars: pd.DataFrame, clean_dir: Path) -> Path:
+    """Write the ETF proxy bars (overwrites); returns the file written."""
+    out = clean_dir / ETF_PROXY_FILE
+    out.parent.mkdir(parents=True, exist_ok=True)
+    bars.to_parquet(out, index=False)
+    return out
 
 
 def _glob(clean_dir: Path, sub: str, depth: int) -> str:
@@ -77,4 +88,7 @@ def connect(clean_dir: Path = CLEAN_DIR) -> duckdb.DuckDBPyConnection:
         "SELECT b.*, r.avg_volume_20d, b.volume / NULLIF(r.avg_volume_20d, 0) AS rvol "
         "FROM bars_5m b LEFT JOIN rvol_profile r ON b.symbol = r.symbol AND b.ts = r.ts"
     )
+    etf = clean_dir / ETF_PROXY_FILE
+    if etf.is_file():
+        con.execute(f"CREATE VIEW etf_proxy_1d AS SELECT * FROM read_parquet('{etf.as_posix()}')")
     return con

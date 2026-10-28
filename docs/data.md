@@ -60,6 +60,37 @@ niftyindices.com (NSE Indices Ltd), plus NSE's ETF list. Download with:
 | `data/raw/indices/nse_etf_list.csv` | NSE `eq_etfseclist.csv` as downloaded (symbol, underlying, date of listing) |
 | `data/raw/indices/manifest.json` | download time, index names, endpoints, row counts |
 
-Values are the source's text; only dates are rewritten as ISO. Nothing is cleaned or
-built from these files yet. A re-download overwrites them, and the source may revise
-history, so the manifest's download time matters.
+Values are the source's text; only dates are rewritten as ISO. A re-download
+overwrites them, and the source may revise history, so the manifest's download time
+matters.
+
+## ETF proxy dataset (strategy 4)
+
+Tradable proxies for NSE equity ETFs, one daily series per index in
+`config/etf_proxy.yaml`: the 11 sectors with an ETF on NSE today (`PX_BANK` ...
+`PX_FINSERV`; Media has none) at a 0.40% a year expense ratio, and `PX_NIFTY50` at
+0.05% (benchmark 2 only, never traded). Build after `scripts/build_data.py`, which
+clears data/clean:
+
+    uv run python scripts/build_etf_proxy.py
+
+| Output | What |
+|---|---|
+| `data/clean/etf_proxy/bars.parquet` | `symbol`, `session_date`, `open`, `high`, `low`, `close` (no volume) |
+| `data/clean/etf_proxy/manifest.json` | settings, rows, date range, SHA-256 of every raw file read |
+
+Construction (`src/nsealgo/data/etf_proxy.py`):
+
+- Only the sessions of `data/clean/calendar` (2016-01-04 .. 2026-04-07) are kept;
+  muhurat and DR-site sessions in the index files are dropped, and so is the index
+  history outside that range. A session without a complete, positive price and TRI row
+  fails the build.
+- close = TRI rebased to 100 on 2016-01-04, times `(1 - e / 365) ^ d`, where `d` is the
+  calendar days since 2016-01-04 and `e` the expense ratio (daily accrual, actual/365).
+- open, high, low = that close x the price index's open, high, low over its close the
+  same day.
+
+DuckDB view `etf_proxy_1d`. The loader reads it for instrument ETF, under the same
+holdout lock as the equity data. It is a proxy, not ETF prices: no tracking error, no
+premium or discount to NAV, no spread beyond the slippage tier, no volume, and most
+sector ETFs listed only in 2020 or later.

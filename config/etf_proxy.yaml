@@ -1,0 +1,42 @@
+# Tradable proxies for NSE equity ETFs, built from index history (strategy 4,
+# research/strategy4_plan.md section 3) by scripts/build_etf_proxy.py:
+#   data/raw/indices/<index>_{price,tri}.csv -> data/clean/etf_proxy/bars.parquet
+# Close = the total-return index rebased to 100 on the first calendar session, less the
+# expense ratio accrued daily over calendar days (actual/365); open/high/low = that
+# close x the price index's open/high/low over its close the same day. Only sessions of
+# data/clean/calendar are kept. Rebuild after scripts/build_data.py (which clears
+# data/clean). Changing anything here is a new dataset: strategy versions that read it
+# must be rerun as new trials.
+
+raw_dir: data/raw/indices
+
+# symbol: index key in data/raw/indices and expense ratio, percent a year
+series:
+  PX_BANK: {index: bank, expense_ratio_pct: 0.40}
+  PX_IT: {index: it, expense_ratio_pct: 0.40}
+  PX_PHARMA: {index: pharma, expense_ratio_pct: 0.40}
+  PX_FMCG: {index: fmcg, expense_ratio_pct: 0.40}
+  PX_AUTO: {index: auto, expense_ratio_pct: 0.40}
+  PX_METAL: {index: metal, expense_ratio_pct: 0.40}
+  PX_REALTY: {index: realty, expense_ratio_pct: 0.40}
+  PX_ENERGY: {index: energy, expense_ratio_pct: 0.40}
+  PX_PSUBANK: {index: psubank, expense_ratio_pct: 0.40}
+  PX_INFRA: {index: infra, expense_ratio_pct: 0.40}
+  PX_FINSERV: {index: finserv, expense_ratio_pct: 0.40}
+  PX_NIFTY50: {index: nifty50, expense_ratio_pct: 0.05}
+
+# What an ETF strategy (instrument ETF) trades: the 11 sectors with an ETF on NSE today
+# (Nifty Media has none). PX_NIFTY50 is benchmark 2 only and is never traded.
+universe:
+  - PX_BANK
+  - PX_IT
+  - PX_PHARMA
+  - PX_FMCG
+  - PX_AUTO
+  - PX_METAL
+  - PX_REALTY
+  - PX_ENERGY
+  - PX_PSUBANK
+  - PX_INFRA
+  - PX_FINSERV
+benchmark: PX_NIFTY50
