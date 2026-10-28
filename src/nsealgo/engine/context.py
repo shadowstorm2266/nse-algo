@@ -4,7 +4,8 @@ Only bars with available_at <= now, the session's daily features (available_at
 09:15), open positions, working orders and today's fills. Arrays are read-only
 views; nothing here does I/O or reads a clock. `next_session` is the next date on the
 trading calendar (tradeable or not), which the exchange holiday list gives in advance;
-`next_tradeable_session` is the next one not marked no_trade.
+`next_tradeable_session` is the next one not marked no_trade. `sessions_since(day)` counts
+calendar sessions from `day` to today (e.g. how long a position has been held).
 """
 
 from collections.abc import Iterator, Mapping
@@ -17,6 +18,7 @@ import pandas as pd
 
 from nsealgo.engine.market import Series, SessionSlice
 from nsealgo.engine.portfolio import PositionView
+from nsealgo.engine.sessions import TradingCalendar
 from nsealgo.engine.types import Fill, OrderView
 
 _EMPTY_F = np.empty(0, dtype="float64")
@@ -81,6 +83,7 @@ class StrategyContext:
     fills_today: tuple[Fill, ...]
     _slice: SessionSlice
     _now_ns: int
+    _calendar: TradingCalendar
 
     def bars(self, symbol: str) -> BarView:
         s = self._slice.series.get(symbol)
@@ -95,6 +98,11 @@ class StrategyContext:
 
     def last_close(self, symbol: str) -> float | None:
         return self.bars(symbol).last_close
+
+    def sessions_since(self, day: date) -> int:
+        """Calendar sessions from `day` to today, both included, tradeable or not
+        (1 when `day` is today; 0 when it is after today)."""
+        return self._calendar.sessions_between(day, self.session_date)
 
 
 class LastCloses(Mapping[str, float]):

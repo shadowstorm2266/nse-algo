@@ -1,6 +1,6 @@
 """Trading calendar and session clock helpers for the engine."""
 
-from bisect import bisect_right
+from bisect import bisect_left, bisect_right
 from collections.abc import Collection, Iterable, Sequence
 from datetime import date, datetime, time
 
@@ -58,6 +58,10 @@ class TradingCalendar:
         """The next session on the calendar, tradeable or not; None after the last."""
         i = bisect_right(self.sessions, day)
         return self.sessions[i] if i < len(self.sessions) else None
+
+    def sessions_between(self, start: date, end: date) -> int:
+        """Sessions from `start` to `end`, both included, tradeable or not."""
+        return max(0, bisect_right(self.sessions, end) - bisect_left(self.sessions, start))
 
     def next_tradeable_after(self, day: date) -> date | None:
         i = bisect_right(self.sessions, day)

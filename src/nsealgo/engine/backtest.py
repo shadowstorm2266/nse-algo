@@ -269,6 +269,7 @@ class Backtester:
             fills_today=tuple(self.portfolio.fills_today),
             _slice=sl,
             _now_ns=now_ns,
+            _calendar=self.calendar,
         )
 
     def _snapshot(self, now: pd.Timestamp, marks: Mapping[str, float]) -> AccountSnapshot:

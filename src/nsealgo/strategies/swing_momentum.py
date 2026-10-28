@@ -34,6 +34,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from nsealgo.engine.context import BarView, StrategyContext
 from nsealgo.engine.types import IntentKind, OrderIntent, OrderRole, Product, Side
+from nsealgo.strategies.indicators import above_average
 
 MAX_SESSIONS_PER_MONTH = 23  # NSE months have at most 23 weekday sessions
 
@@ -93,11 +94,6 @@ def month_end_close(months: np.ndarray, close: np.ndarray, month: int) -> float 
     if i < 0 or months[i] != month:
         return None
     return float(close[i])
-
-
-def above_average(bars: BarView, sessions: int) -> bool:
-    c = bars.close
-    return len(c) >= sessions and float(c[-1]) > float(c[-sessions:].mean())
 
 
 class SwingMomentumStrategy:

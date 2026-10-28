@@ -9,11 +9,13 @@ from typing import Any
 
 from nsealgo.strategies.base import Strategy
 from nsealgo.strategies.orb import OrbStrategy
+from nsealgo.strategies.pullback import PullbackStrategy
 from nsealgo.strategies.swing_momentum import SwingMomentumStrategy
 
 REGISTRY: dict[str, Callable[..., Strategy]] = {
     "orb": OrbStrategy,
     "swing": SwingMomentumStrategy,
+    "pullback": PullbackStrategy,
 }
 
 

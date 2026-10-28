@@ -202,6 +202,19 @@ def test_context_next_session_is_the_next_calendar_session():
     ]
 
 
+def test_context_counts_calendar_sessions_since_a_day():
+    # Calendar sessions from `day` to today, both included, no_trade sessions too. D2 is
+    # left off the calendar, so it does not count.
+    strat = ScriptedStrategy(CNC, "1d", {})
+    days = [D0, D1, D3, D4]
+    run_frames(strat, _daily("A", 100.0, days=days), days, no_trade=(D3,))
+    assert [c.session_date for c in strat.seen] == days
+    assert [c.sessions_since(D0) for c in strat.seen] == [1, 2, 3, 4]
+    assert [c.sessions_since(D1) for c in strat.seen] == [0, 1, 2, 3]
+    assert [c.sessions_since(D2) for c in strat.seen] == [0, 0, 1, 2]
+    assert [c.sessions_since(date(2023, 12, 1)) for c in strat.seen] == [1, 2, 3, 4]
+
+
 @pytest.mark.parametrize(("buffer_pct", "rejected"), [(1, []), (0, ["D"])])
 def test_cash_buffer_absorbs_a_one_pct_opening_gap(buffer_pct, rejected):
     # Four buys at a 50 close fill the account; the next open gaps up 1% to 50.5.

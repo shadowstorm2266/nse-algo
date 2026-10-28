@@ -1,0 +1,16 @@
+# Strategy 3: pullback mean reversion, swing (CNC delivery, daily bars).
+# Pre-registered in research/strategy3_plan.md (version 1); fixed, not tuned.
+# Every parameter lives here; the code has no defaults. Changing a default here is a new
+# strategy version: bump PullbackStrategy.version in src/nsealgo/strategies/pullback.py.
+# Universe: config/universe.yaml. Equal weight, whole shares, the 30% per-position cap,
+# max_positions (4) and the sizing basis belong to config/risk.yaml (swing block) and are
+# enforced by the RiskGovernor, not here.
+#
+# Decision after each tradeable session's close, on data up to that close (none on
+# no_trade sessions); orders fill at the next tradeable session's open.
+
+trend_ma_sessions: 200  # entry: close strictly above its N-session simple average
+rsi_sessions: 2         # entry: Wilder RSI over N sessions ...
+rsi_entry_below: 10     #   ... strictly below this; candidates ranked by lowest RSI
+exit_ma_sessions: 5     # exit: close strictly above its N-session simple average, or
+max_hold_sessions: 10   #   held this many sessions (the buy's fill session counts as 1)

@@ -11,6 +11,8 @@ and live mode; only the broker and the bar source differ.
 | `strategies/base.py` | `Strategy` protocol: `on_bar(ctx) -> list[OrderIntent]`, pure |
 | `strategies/orb.py` | Strategy 1, 30-minute Opening Range Breakout (`config/strategies/orb.yaml`) |
 | `strategies/swing_momentum.py` | Strategy 2, monthly momentum, swing CNC (`config/strategies/swing.yaml`, CLI name `swing`) |
+| `strategies/pullback.py` | Strategy 3, pullback mean reversion, swing CNC (`config/strategies/pullback.yaml`, CLI name `pullback`; rules in `research/strategy3_plan.md`) |
+| `strategies/indicators.py` | daily-bar helpers shared by the swing strategies (simple-average filter, Wilder RSI) |
 | `engine/context.py` | `StrategyContext`: only what is visible at `now` |
 | `engine/risk.py` | `RiskGovernor`: the only code that turns intents into orders |
 | `engine/sizing.py`, `engine/exposure.py` | pure qty and exposure arithmetic for the RiskGovernor |
@@ -42,7 +44,8 @@ The loop walks bar groups (all symbols' bars that start at the same time):
 The context also carries `next_session`, the next date on the trading calendar
 (tradeable or not; None after the last), which the exchange holiday list gives in
 advance, and `next_tradeable_session`, the next one not marked no_trade. The monthly
-swing strategy uses the latter to know it is on the last tradeable session of a month.
+swing strategy uses the latter to know it is on the last tradeable session of a month. `sessions_since(day)` counts calendar sessions from `day` to the decision
+session, both included, no_trade sessions too (the pullback strategy's sessions held).
 
 So a signal on bar T fills at bar T+1's open at the earliest. A fill inside bar T+1
 becomes visible at T+1's `available_at`. Daily bars have `ts` 09:15 and `available_at`
