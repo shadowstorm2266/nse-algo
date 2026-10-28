@@ -45,3 +45,21 @@ Query through `nsealgo.data.store.connect()`: views `bars_1m`, `bars_5m`, `bars_
   outside our window).
 - `config/holidays.csv` is for live/paper trading only; the historical calendar comes
   from the data.
+
+## Index data (strategy 4, raw only)
+
+Daily history from 2015-01-01 of the Nifty 50 and 12 sectoral indices, from
+niftyindices.com (NSE Indices Ltd), plus NSE's ETF list. Download with:
+
+    uv run python scripts/download_indices.py
+
+| Output | What |
+|---|---|
+| `data/raw/indices/<key>_price.csv` | price index: `date`, `open`, `high`, `low`, `close` |
+| `data/raw/indices/<key>_tri.csv` | total-return index `tri` and net total-return `ntr` (`-` where the source has none) |
+| `data/raw/indices/nse_etf_list.csv` | NSE `eq_etfseclist.csv` as downloaded (symbol, underlying, date of listing) |
+| `data/raw/indices/manifest.json` | download time, index names, endpoints, row counts |
+
+Values are the source's text; only dates are rewritten as ISO. Nothing is cleaned or
+built from these files yet. A re-download overwrites them, and the source may revise
+history, so the manifest's download time matters.
