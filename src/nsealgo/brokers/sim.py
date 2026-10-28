@@ -6,7 +6,8 @@
    morning's sale proceeds can fund that morning's buys;
 3. resting STOP/LIMIT orders per symbol: OCO entry legs (the one nearest the open
    fills, siblings are cancelled), then bracket children (stop before target).
-Every fill pays `costs.fill_charges` plus slippage. The DP charge applies to the
+Every fill pays `costs.fill_charges` for the broker's instrument (equity, or
+equity-ETF units on CNC) plus slippage. The DP charge applies to the
 first CNC sell of a scrip in each session. A CNC buy that cash cannot cover is
 rejected (INSUFFICIENT_CASH), as a real broker would; "cash" is the funds view's
 buying power: real cash, not reduced by unrealized losses on delivery holdings (see
@@ -75,8 +76,10 @@ class SimBroker:
         *,
         funds: FundsView,
         on_fill: Callable[[Fill], object],
+        instrument: str = "EQ",
     ) -> None:
         self._rates = costs.rates
+        self._instrument = instrument
         self._preset = costs.brokerage_presets[brokerage_preset]
         self._bps = slippage_bps
         self._funds = funds
@@ -221,7 +224,9 @@ class SimBroker:
         model = self._preset.intraday if o.product is Product.MIS else self._preset.delivery
         first_sell = (o.symbol, day) not in self._dp_paid
         dp = self._preset.dp_charge_per_scrip if _cnc_sell(o) and first_sell else ZERO
-        return fill_charges(o.product, o.side, value, self._rates, model, dp)
+        return fill_charges(
+            o.product, o.side, value, self._rates, model, dp, instrument=self._instrument
+        )
 
     def _fill(
         self, st: _State, bar: Bar, ref: Decimal, fills: list[Fill], entry_on_bar: bool = False

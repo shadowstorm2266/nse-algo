@@ -12,6 +12,7 @@ and live mode; only the broker and the bar source differ.
 | `strategies/orb.py` | Strategy 1, 30-minute Opening Range Breakout (`config/strategies/orb.yaml`) |
 | `strategies/swing_momentum.py` | Strategy 2, monthly momentum, swing CNC (`config/strategies/swing.yaml`, CLI name `swing`) |
 | `strategies/pullback.py` | Strategy 3, pullback mean reversion, swing CNC (`config/strategies/pullback.yaml`, CLI name `pullback`; rules in `research/strategy3_plan.md`) |
+| `strategies/sector_rotation.py` | Strategy 4, swing v2's rules on the sector-ETF proxies, CNC, instrument ETF (`config/strategies/sector_rotation.yaml`, CLI name `sector_rotation`; rules in `research/strategy4_plan.md`) |
 | `strategies/indicators.py` | daily-bar helpers shared by the swing strategies (simple-average filter, Wilder RSI) |
 | `engine/context.py` | `StrategyContext`: only what is visible at `now` |
 | `engine/risk.py` | `RiskGovernor`: the only code that turns intents into orders |
@@ -30,6 +31,23 @@ has no defaults and rejects unknown keys. `--params` is a JSON object merged ove
 YAML (nested keys merge), e.g.
 `--params '{"filters": {"gap": {"enabled": false}}}'`. The merged parameters go into
 the trial record. Changing a YAML default is a new strategy version.
+
+## Instrument
+
+Every strategy declares an `instrument`: `"EQ"` (equity; ORB, swing, pullback) or
+`"ETF"` (equity-ETF units, CNC only; sector_rotation). It picks:
+
+- the charges on every fill (SimBroker) and in the RiskGovernor's estimated buy charges
+  for swing sizing (`costs.py`: ETF units pay STT 0.001% on the sell only and stamp
+  0.015% on the buy);
+- the slippage table: `slippage_bps_per_side` (EQ) or `etf_slippage_bps_per_side`
+  (ETF) in `config/costs.yaml`, by `--cost-tier`;
+- the data and default universe: equity bars from data/clean and
+  `config/universe.yaml` (EQ), or the ETF proxy dataset (`data/clean/etf_proxy`, see
+  docs/data.md) and the `universe` of `config/etf_proxy.yaml` (ETF). ETF bars are daily
+  only, have no volume and no daily features.
+
+The trial record holds the `instrument`.
 
 ## Timing (no look-ahead)
 
@@ -55,8 +73,8 @@ deliberately leaky engines (bars visible one bar early, fills visible early).
 
 ## Fill rules (SimBroker)
 
-- Slippage (bps per side, from the `--cost-tier` in `config/costs.yaml`) applies to
-  **every** fill, limit fills included (hard rule 5). Buys pay up, sells receive less.
+- Slippage (bps per side, from the `--cost-tier` in the instrument's table in
+  `config/costs.yaml`) applies to **every** fill, limit fills included (hard rule 5). Buys pay up, sells receive less.
 - Market orders fill at the next bar's open.
 - Stops trigger on touch and fill at the stop, or at the open if the bar gaps
   through it.
@@ -183,8 +201,8 @@ whatever needed it.
 
 Every run appends one line to `research/trials.jsonl` (append-only; the DSR trial
 count). The line holds the git hash and dirty flag, strategy and version, params,
-period, cost tier, slippage, brokerage preset, universe, metrics, warnings and the run
-dir. A run
+instrument, period, cost tier, slippage, brokerage preset, universe, metrics, warnings
+and the run dir. A run
 with the `zero` brokerage preset or the `none` (0 bps) slippage tier is flagged
 `reference_tier: true`: a labelled reference, never a tradeable result.
 
@@ -202,8 +220,11 @@ over the whole period: return, max drawdown and the run's excess return (run min
 benchmark, percentage points). `--exclude` takes those symbols' trades out of the run:
 each session's equity minus their fills' cash flows (sales add value, buys subtract
 it, every fill pays its charges) and their holdings at the close; other trades are
-unchanged, including sizes set off an account that held them. The benchmark is not a
-strategy and not a trial; it reads daily bars from data/clean, never on or after
+unchanged, including sizes set off an account that held them. For an ETF run the buy
+pays ETF charges and the ETF base slippage, and a second table compares the run with
+the same buy-and-hold of `config/etf_proxy.yaml`'s `benchmark` series alone (benchmark
+2, the Nifty 50 TRI proxy). The benchmark is not a strategy and not a trial; it reads
+daily bars from data/clean (the ETF proxy dataset for ETF runs), never on or after
 `holdout_start`.
 
 ## Metrics
@@ -241,6 +262,9 @@ re-checks that no session on or after `holdout_start` is read without permission
 - Charges are per order, not per contract note. Each leg's components are rounded
   separately.
 - Universe membership is not point-in-time (see `config/universe.yaml`).
+- ETF runs trade proxies built from index history, not ETF prices: no tracking error,
+  no premium or discount to NAV, and ETFs assumed to exist before they listed (see
+  docs/data.md and `research/strategy4_plan.md` section 3).
 - The calendar is known in advance: `next_session` and `next_tradeable_session` in the
   context, and `no_trade` flags (outage days). Swing orders deferred past an outage day
   use that knowledge, and so would a month-end swing decision moved to the session

@@ -24,7 +24,7 @@ import pandas as pd
 
 from nsealgo.brokers.fills import Bar
 from nsealgo.brokers.sim import BrokerEvent, SimBroker
-from nsealgo.costs import CostConfig
+from nsealgo.costs import INSTRUMENTS, CostConfig
 from nsealgo.data.calendar import IST
 from nsealgo.engine.config import MarginConfig, RiskConfig
 from nsealgo.engine.context import LastCloses, StrategyContext
@@ -86,6 +86,10 @@ def validate_strategy(strategy: Strategy, risk: RiskConfig) -> None:
     tf = strategy.timeframe
     if tf not in TIMEFRAMES:
         raise ValueError(f"unknown timeframe {tf!r}")
+    if strategy.instrument not in INSTRUMENTS:
+        raise ValueError(f"unknown instrument {strategy.instrument!r}")
+    if strategy.instrument == "ETF" and strategy.product is not Product.CNC:
+        raise ValueError("ETF strategies trade delivery (CNC) only")
     if strategy.product is Product.MIS:
         if tf == "1d":
             raise ValueError("MIS strategies need an intraday timeframe")
@@ -123,6 +127,7 @@ class Backtester:
             slippage_bps,
             funds=self.portfolio,
             on_fill=self._on_fill,
+            instrument=strategy.instrument,
         )
         self.risk = RiskGovernor(
             risk_config,
@@ -131,6 +136,7 @@ class Backtester:
             costs,
             brokerage_preset,
             product=strategy.product,
+            instrument=strategy.instrument,
             mode=mode,
             kill_file=kill_file,
         )

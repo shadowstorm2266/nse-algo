@@ -45,7 +45,6 @@ from nsealgo.engine.types import (
 from nsealgo.settings import Mode
 
 logger = logging.getLogger("nsealgo.risk")
-ZERO = Decimal(0)
 R = RejectReason
 Problem = tuple[RejectReason, str] | None
 
@@ -60,6 +59,7 @@ class RiskGovernor:
         brokerage_preset: str,
         *,
         product: Product,
+        instrument: str = "EQ",
         mode: Mode = "backtest",
         kill_file: Path | None = None,
     ) -> None:
@@ -69,6 +69,7 @@ class RiskGovernor:
         self._rates = costs.rates
         self._delivery = costs.brokerage_presets[brokerage_preset].delivery
         self.product = product
+        self.instrument = instrument  # buy charges in swing sizing
         self.halt_mode = config.halt_mode.for_mode(mode)
         self.sizing_basis = config.sizing_basis.for_mode(mode, product)
         self.kill_file = kill_file
@@ -82,7 +83,7 @@ class RiskGovernor:
         self.observe_equity(snap.equity, snap.peak_equity, snap.session_date, snap.now)
 
     def observe_equity(self, equity: Decimal, peak: Decimal, day: date, now: pd.Timestamp) -> None:
-        dd = (peak - equity) / peak * 100 if peak > 0 else ZERO
+        dd = (peak - equity) / peak * 100 if peak > 0 else Decimal(0)
         if dd < self.config.account_drawdown_halt_pct:
             return
         if self.halt is None:
@@ -319,6 +320,7 @@ class RiskGovernor:
             position_cap=equity * sw.max_position_pct / 100,
             gross_left=equity * sw.max_gross_exposure_pct / 100 - held_gross,
             pending=pending,
+            instrument=self.instrument,
         )
 
     # --- helpers ---

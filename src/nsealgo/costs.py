@@ -4,8 +4,8 @@ else as equity delivery). Equity ("EQ") is the default instrument.
 
 Pure functions on Decimal rupees. Each component is computed exactly and then
 rounded to the paisa (half-up); `total` is the sum of the rounded components.
-Slippage is not a charge here: it is applied to fill prices by the simulator
-using `CostConfig.slippage_bps_per_side`.
+Slippage is not a charge here: it is applied to fill prices by the simulator, from
+the instrument's tier table (`CostConfig.slippage_table`).
 """
 
 from dataclasses import dataclass
@@ -118,11 +118,20 @@ class CostConfig:
     rates: StatutoryRates
     brokerage_presets: dict[str, BrokerPreset]
     active_brokerage: str
-    slippage_bps_per_side: dict[str, Decimal]
+    slippage_bps_per_side: dict[str, Decimal]  # equity
+    etf_slippage_bps_per_side: dict[str, Decimal]  # equity-ETF units
 
     @property
     def broker(self) -> BrokerPreset:
         return self.brokerage_presets[self.active_brokerage]
+
+    def slippage_table(self, instrument: str) -> dict[str, Decimal]:
+        """Slippage tiers (bps per side) for fills in `instrument`."""
+        if instrument == "EQ":
+            return self.slippage_bps_per_side
+        if instrument == "ETF":
+            return self.etf_slippage_bps_per_side
+        raise ValueError(f"unknown instrument {instrument!r}")
 
 
 def _validate_values(buy_value: Decimal, sell_value: Decimal) -> None:
@@ -279,4 +288,5 @@ def load_cost_config(path: Path) -> CostConfig:
         brokerage_presets=presets,
         active_brokerage=active,
         slippage_bps_per_side={k: _dec(v) for k, v in raw["slippage_bps_per_side"].items()},
+        etf_slippage_bps_per_side={k: _dec(v) for k, v in raw["etf_slippage_bps_per_side"].items()},
     )

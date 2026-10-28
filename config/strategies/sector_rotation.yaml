@@ -1,0 +1,26 @@
+# Strategy 4: sector rotation over sector-ETF proxies, swing (CNC delivery, daily bars).
+# Pre-registered in research/strategy4_plan.md (version 1); fixed, not tuned.
+# The rules and values are swing v2's (config/strategies/swing.yaml), applied to the 11
+# sector series of config/etf_proxy.yaml (instrument ETF).
+# Every parameter lives here; the code has no defaults. Changing a default here is a new
+# strategy version: bump SectorRotationStrategy.version in
+# src/nsealgo/strategies/sector_rotation.py.
+# Equal weight, whole units, the 30% per-position cap, max_positions (4) and the sizing
+# basis belong to config/risk.yaml (swing block) and are enforced by the RiskGovernor.
+#
+# Decision after the close of the last tradeable session of each month (M), using data up
+# to that close (a month whose last session is no_trade decides on the last tradeable
+# session before it); orders fill at the next tradeable session's open.
+
+top_n: 4                # hold the top N by momentum
+lookback_months: 6      # momentum = close at the end of month M-skip over the close at the
+skip_months: 1          #   end of month M-skip-lookback, minus 1 (skips the latest month)
+trend_ma_sessions: 200  # keep only series whose close is above their N-session simple average
+# false: holdings still in the top N are kept as they are (no top-up or trim); only series
+# that drop out are sold and only newcomers are bought.
+resize_holdings: false
+
+market_filter:          # off, as in swing v2
+  enabled: false
+  index_symbol: PX_NIFTY50
+  ma_sessions: 200

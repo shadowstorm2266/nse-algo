@@ -225,6 +225,7 @@ class ScriptedStrategy:
     script: Mapping[pd.Timestamp, list[OrderIntent]]
     name: str = "scripted"
     version: str = "test"
+    instrument: str = "EQ"
     lookback_sessions: int = 0
     reference_symbols: tuple[str, ...] = ()
     seen: list[Any] = field(default_factory=list, compare=False)

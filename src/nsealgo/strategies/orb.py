@@ -142,6 +142,7 @@ class OrbStrategy:
     name = "orb"
     version = "1"  # bump on any logic change or change of a default in orb.yaml
     product = Product.MIS
+    instrument = "EQ"
     lookback_sessions = 0
     reference_symbols: tuple[str, ...] = ()
 

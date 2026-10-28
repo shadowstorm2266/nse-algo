@@ -102,6 +102,7 @@ class SwingMomentumStrategy:
     # 2: a month ending on no_trade sessions decides on its last tradeable session
     version = "2"
     product = Product.CNC
+    instrument = "EQ"
     timeframe = "1d"
 
     def __init__(self, **params: Any) -> None:

@@ -1,8 +1,10 @@
 """Backtest inputs from data/clean (DuckDB views), with the holdout lock.
 
 Intraday bars load one calendar year at a time; daily bars are aggregated from 1m
-bars (ts 09:15, available_at 15:30). Nothing on or after `holdout_start` is read
-unless the caller passes `allow_holdout=True`.
+bars (ts 09:15, available_at 15:30). Instrument "ETF" reads daily bars from the ETF
+proxy dataset instead (view etf_proxy_1d, scripts/build_etf_proxy.py; no volume, no
+daily features). Nothing on or after `holdout_start` is read unless the caller passes
+`allow_holdout=True`.
 """
 
 from collections.abc import Iterator, Sequence
@@ -108,6 +110,18 @@ def load_calendar(con: duckdb.DuckDBPyConnection, start: date, end: date) -> pd.
     ).df()
 
 
+def _daily_view(con: duckdb.DuckDBPyConnection, instrument: str) -> str:
+    """The view holding `instrument`'s daily data: bars_1m (EQ) or etf_proxy_1d (ETF)."""
+    if instrument == "EQ":
+        return "bars_1m"
+    if instrument != "ETF":
+        raise ValueError(f"unknown instrument {instrument!r}")
+    views = {r[0] for r in con.execute("SELECT view_name FROM duckdb_views()").fetchall()}
+    if "etf_proxy_1d" not in views:
+        raise FileNotFoundError("ETF proxy dataset not built; run scripts/build_etf_proxy.py")
+    return "etf_proxy_1d"
+
+
 def session_counts(
     con: duckdb.DuckDBPyConnection,
     symbols: Sequence[str],
@@ -115,6 +129,7 @@ def session_counts(
     *,
     research: ResearchConfig,
     allow_holdout: bool,
+    instrument: str = "EQ",
 ) -> dict[str, int]:
     """Sessions with bars per symbol in the inclusive `period` (0 for symbols without data)."""
     start, end = period
@@ -122,7 +137,7 @@ def session_counts(
     if not symbols:
         return {}
     rows = con.execute(
-        "SELECT symbol, count(DISTINCT session_date) FROM bars_1m "
+        f"SELECT symbol, count(DISTINCT session_date) FROM {_daily_view(con, instrument)} "
         f"WHERE symbol IN {_in_list(symbols)} AND session_date BETWEEN ? AND ? GROUP BY symbol",
         [start, end],
     ).fetchall()
@@ -143,9 +158,24 @@ def lookback_start(con: duckdb.DuckDBPyConnection, start: date, sessions: int) -
 
 
 def load_bars(
-    con: duckdb.DuckDBPyConnection, timeframe: str, symbols: Sequence[str], start: date, end: date
+    con: duckdb.DuckDBPyConnection,
+    timeframe: str,
+    symbols: Sequence[str],
+    start: date,
+    end: date,
+    *,
+    instrument: str = "EQ",
 ) -> pd.DataFrame:
     where = f"symbol IN {_in_list(symbols)} AND session_date BETWEEN ? AND ?"
+    if instrument == "ETF":
+        if timeframe != "1d":
+            raise ValueError("ETF proxy bars are daily only")
+        df = con.execute(
+            "SELECT symbol, session_date, open, high, low, close, 0::BIGINT AS volume "
+            f"FROM {_daily_view(con, instrument)} WHERE {where} ORDER BY symbol, session_date",
+            [start, end],
+        ).df()
+        return _daily_stamps(df)
     if timeframe != "1d":
         cols = ", ".join(BAR_COLS)
         return con.execute(
@@ -157,6 +187,11 @@ def load_bars(
         f"FROM bars_1m WHERE {where} GROUP BY symbol, session_date ORDER BY symbol, session_date",
         [start, end],
     ).df()
+    return _daily_stamps(df)
+
+
+def _daily_stamps(df: pd.DataFrame) -> pd.DataFrame:
+    """Daily bars in BAR_COLS: ts at the 09:15 open, available_at at the 15:30 close."""
     midnight = pd.to_datetime(df["session_date"]).dt.tz_localize(IST)
     df["ts"] = midnight + OPEN_OFFSET
     df["available_at"] = midnight + CLOSE_OFFSET
@@ -182,17 +217,22 @@ def market_chunks(
     lookback_sessions: int,
     research: ResearchConfig,
     allow_holdout: bool,
+    instrument: str = "EQ",
 ) -> Iterator[MarketData]:
-    """MarketData for the run sessions: one chunk per year intraday, one chunk for daily."""
+    """MarketData for the run sessions: one chunk per year intraday, one chunk for daily.
+    ETF chunks are daily and carry no features."""
     if not sessions:
         return
     check_holdout(max(sessions), research, allow_holdout)
     if timeframe == "1d":
         first = lookback_start(con, min(sessions), lookback_sessions)
-        bars = load_bars(con, timeframe, symbols, first, max(sessions))
-        feats = load_features(con, symbols, min(sessions), max(sessions))
+        bars = load_bars(con, timeframe, symbols, first, max(sessions), instrument=instrument)
+        etf = instrument == "ETF"
+        feats = None if etf else load_features(con, symbols, min(sessions), max(sessions))
         yield MarketData(timeframe, bars, sessions, feats)
         return
+    if instrument != "EQ":
+        raise ValueError(f"{instrument} data is daily only")
     for year in sorted({d.year for d in sessions}):
         days = [d for d in sessions if d.year == year]
         bars = load_bars(con, timeframe, symbols, days[0], days[-1])

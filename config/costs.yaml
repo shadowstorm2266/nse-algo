@@ -64,3 +64,10 @@ slippage_bps_per_side:
   base: 3
   stress1: 6
   stress2: 10
+# The same tiers for equity-ETF units (instrument ETF; strategy 4, owner's values,
+# research/strategy4_plan.md section 5). Used instead of the table above for ETF runs.
+etf_slippage_bps_per_side:
+  none: 0
+  base: 10
+  stress1: 20
+  stress2: 30

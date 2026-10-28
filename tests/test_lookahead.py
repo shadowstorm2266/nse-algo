@@ -72,6 +72,7 @@ class RandomFeatureMIS:
     timeframe: str = "5m"
     name: str = "random_feature_mis"
     version: str = "test"
+    instrument: str = "EQ"
     lookback_sessions: int = 0
     seen: list = field(default_factory=list, compare=False)
 
@@ -131,6 +132,7 @@ class RandomFeatureSwing:
     timeframe: str = "1d"
     name: str = "random_feature_swing"
     version: str = "test"
+    instrument: str = "EQ"
     lookback_sessions: int = 0
     seen: list = field(default_factory=list, compare=False)
 

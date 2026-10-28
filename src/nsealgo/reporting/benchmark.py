@@ -30,13 +30,14 @@ def buy_and_hold(
     rates: StatutoryRates,
     delivery: BrokerageModel,
     slippage_bps: Decimal,
+    instrument: str = "EQ",
 ) -> pd.DataFrame:
     """Session-end equity (session_date, equity) of an equal-weight buy-and-hold.
 
     Every symbol in `bars` needs a bar on the first session. Each gets capital / n: one
-    CNC buy's charges (on that share) come out of it, the rest buys fractional shares
-    at the first open plus `slippage_bps`, and the few paise left stay in cash. No sell
-    costs: holdings are marked at each session's close.
+    CNC buy's charges in `instrument` (on that share) come out of it, the rest buys
+    fractional shares at the first open plus `slippage_bps`, and the few paise left stay
+    in cash. No sell costs: holdings are marked at each session's close.
     """
     days = sorted(bars["session_date"].unique())
     first = bars[bars["session_date"] == days[0]].set_index("symbol")
@@ -46,9 +47,13 @@ def buy_and_hold(
         raise ValueError(f"no bar on the first session {days[0]} for {missing}")
     share = Decimal(str(capital)) / len(symbols)
     cash, qty = Decimal(0), {}
+
+    def charges(value: Decimal) -> Decimal:
+        return fill_charges("CNC", "BUY", value, rates, delivery, instrument=instrument).total
+
     for s in symbols:
-        value = share - fill_charges("CNC", "BUY", share, rates, delivery).total
-        cash += share - value - fill_charges("CNC", "BUY", value, rates, delivery).total
+        value = share - charges(share)
+        cash += share - value - charges(value)
         price = Decimal(str(first.at[s, "open"])) * (1 + slippage_bps / 10_000)
         qty[s] = float(value / price)
     closes = _closes(bars, pd.Index(pd.to_datetime(days)))

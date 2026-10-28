@@ -70,6 +70,7 @@ def swing_qty(
     position_cap: Decimal,
     gross_left: Decimal,
     pending: Sequence[Decimal],
+    instrument: str = "EQ",
 ) -> SwingSize:
     """Equal-weight shares. slot = equity / max_positions. room = gross_left (the gross
     cap less held positions at marks) less what each pending same-morning buy reserves:
@@ -80,16 +81,20 @@ def swing_qty(
 
     If the slot buys no whole share but one share fits the position cap (and the room),
     buy one. If one share is above the position cap, skip the stock. The position cap
-    is not reduced by the buffer.
+    is not reduced by the buffer. Buy charges are estimated for `instrument`.
     """
     if price > position_cap:
         detail = f"1 share at {price:.2f} > position cap {position_cap:.2f}"
         return SwingSize(0, RejectReason.PRICE_ABOVE_POSITION_CAP, detail)
     buffer = cash_buffer_pct / 100
-    reserved = sum((p * (1 + buffer) + _buy_charges(p, rates, delivery) for p in pending), ZERO)
+
+    def charges(value: Decimal) -> Decimal:
+        return _buy_charges(value, rates, delivery, instrument)
+
+    reserved = sum((p * (1 + buffer) + charges(p) for p in pending), ZERO)
     per_slot, left = equity / max_positions, gross_left - reserved
-    slot = (per_slot - _buy_charges(per_slot, rates, delivery)) * (1 - buffer)
-    room = (left - _buy_charges(left, rates, delivery)) * (1 - buffer)
+    slot = (per_slot - charges(per_slot)) * (1 - buffer)
+    room = (left - charges(left)) * (1 - buffer)
     by_slot = floor_shares(slot, price)
     by_cap = floor_shares(position_cap, price)
     by_gross = floor_shares(room, price)
@@ -103,8 +108,11 @@ def swing_qty(
     return SwingSize(qty, None, detail)
 
 
-def _buy_charges(value: Decimal, rates: StatutoryRates, delivery: BrokerageModel) -> Decimal:
-    """Estimated CNC buy charges on a buy of `value` rupees (zero for none)."""
+def _buy_charges(
+    value: Decimal, rates: StatutoryRates, delivery: BrokerageModel, instrument: str
+) -> Decimal:
+    """Estimated CNC buy charges on a buy of `value` rupees of `instrument` (zero for
+    none)."""
     if value <= 0:
         return ZERO
-    return fill_charges("CNC", "BUY", value, rates, delivery).total
+    return fill_charges("CNC", "BUY", value, rates, delivery, instrument=instrument).total

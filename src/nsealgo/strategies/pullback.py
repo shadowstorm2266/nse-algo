@@ -58,6 +58,7 @@ class PullbackStrategy:
     name = "pullback"
     version = "1"  # bump on any logic change or change of a default in pullback.yaml
     product = Product.CNC
+    instrument = "EQ"
     timeframe = "1d"
     reference_symbols: tuple[str, ...] = ()
 

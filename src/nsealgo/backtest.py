@@ -10,6 +10,10 @@ strategy version. Backtests never read the KILL file (see docs/engine.md).
 A strategy's reference symbols (e.g. an index it reads but never trades) are loaded
 with the universe. Missing reference data is printed as a WARNING and recorded in the
 trial's `warnings`; the strategy then skips whatever needed it.
+
+The strategy's instrument picks the data, universe and slippage: "EQ" uses data/clean's
+equity bars, config/universe.yaml and `slippage_bps_per_side`; "ETF" uses the ETF proxy
+dataset, the universe of config/etf_proxy.yaml and `etf_slippage_bps_per_side`.
 """
 
 import argparse
@@ -22,6 +26,7 @@ from typing import Any
 
 from nsealgo.costs import CostConfig, load_cost_config
 from nsealgo.data.calendar import IST
+from nsealgo.data.etf_proxy import ETF_PROXY_CONFIG_PATH, load_etf_proxy_config
 from nsealgo.data.store import CLEAN_DIR, connect
 from nsealgo.engine.backtest import Backtester, BacktestResult
 from nsealgo.engine.config import (
@@ -65,7 +70,15 @@ class RunPaths:
     costs: Path = COSTS_PATH
     research: Path = RESEARCH_CONFIG_PATH
     universe: Path = UNIVERSE_PATH
+    etf_proxy: Path = ETF_PROXY_CONFIG_PATH
     strategies: Path = STRATEGY_CONFIG_DIR
+
+
+def default_universe(instrument: str, paths: RunPaths) -> list[str]:
+    """The symbols a strategy of `instrument` trades unless --symbols says otherwise."""
+    if instrument == "ETF":
+        return list(load_etf_proxy_config(paths.etf_proxy).universe)
+    return load_universe(paths.universe)
 
 
 def coverage_warnings(counts: dict[str, int], sessions: int, period: Period) -> list[str]:
@@ -107,6 +120,7 @@ def _simulate(
         (period.start, period.end),
         research=research,
         allow_holdout=allow_holdout,
+        instrument=strategy.instrument,
     )
     chunks = market_chunks(
         con,
@@ -116,6 +130,7 @@ def _simulate(
         lookback_sessions=strategy.lookback_sessions,
         research=research,
         allow_holdout=allow_holdout,
+        instrument=strategy.instrument,
     )
     bt = Backtester(
         strategy,
@@ -125,7 +140,7 @@ def _simulate(
         margins=load_margin_config(paths.margins),
         costs=costs,
         brokerage_preset=brokerage,
-        slippage_bps=costs.slippage_bps_per_side[cost_tier],
+        slippage_bps=costs.slippage_table(strategy.instrument)[cost_tier],
         mode="backtest",
         kill_file=None,
     )
@@ -159,8 +174,8 @@ def _check_inputs(
     if period.holdout and holdout_already_run(paths.trials, strategy.name, strategy.version):
         raise HoldoutLockedError(f"holdout already run for {strategy.name} {strategy.version}")
     costs = load_cost_config(paths.costs)
-    if cost_tier not in costs.slippage_bps_per_side:
-        raise ValueError(f"unknown cost tier {cost_tier!r}")
+    if cost_tier not in costs.slippage_table(strategy.instrument):
+        raise ValueError(f"unknown cost tier {cost_tier!r} for {strategy.instrument}")
     preset = brokerage or costs.active_brokerage
     if preset not in costs.brokerage_presets:
         raise ValueError(f"unknown brokerage preset {preset!r}")
@@ -187,6 +202,7 @@ def _trial_record(
         "strategy_version": strategy.version,
         "params": strategy.params(),
         "product": str(strategy.product),
+        "instrument": strategy.instrument,
         "timeframe": strategy.timeframe,
         "period": {"label": period.label, "start": period.start, "end": period.end},
         "holdout": period.holdout,
@@ -219,7 +235,7 @@ def run_backtest(
     period, costs, preset = _check_inputs(
         strategy, period_label, cost_tier, brokerage, allow_holdout, paths
     )
-    universe = symbols or load_universe(paths.universe)
+    universe = symbols or default_universe(strategy.instrument, paths)
     result, bt, warnings = _simulate(
         strategy,
         period,
@@ -243,7 +259,7 @@ def run_backtest(
     run_at = datetime.now(IST)
     run_dir = paths.runs_dir / f"{run_at:%Y%m%d-%H%M%S}_{strategy.name}_{period.label}_{cost_tier}"
     _write_outputs(run_dir, result, metrics)
-    slippage = float(costs.slippage_bps_per_side[cost_tier])
+    slippage = float(costs.slippage_table(strategy.instrument)[cost_tier])
     record = _trial_record(
         strategy,
         period,

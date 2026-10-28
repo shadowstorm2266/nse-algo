@@ -16,6 +16,7 @@ class Strategy(Protocol):
     name: str
     version: str  # bump on any logic or default-parameter change (holdout runs once per version)
     product: Product  # MIS (intraday) or CNC (swing)
+    instrument: str  # "EQ" (equity) or "ETF" (equity-ETF units, CNC only): charges and data
     timeframe: str  # "1m", "5m", "15m" (MIS) or "1d" (CNC)
     lookback_sessions: int  # daily bars of history before the period start ("1d" only)
     reference_symbols: tuple[str, ...]  # read, never traded (e.g. an index); data may be missing

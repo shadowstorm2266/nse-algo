@@ -12,9 +12,11 @@ rejections. `--all-symbols` lists every symbol instead of the top and bottom N.
 `benchmark`: the run against an equal-weight buy-and-hold of its universe
 (reporting/benchmark.py: fractional shares, bought at the first session's open with one
 base-tier buy, never rebalanced, no sell costs), by calendar year and over the whole
-period: return, max drawdown and the run's excess return. `--exclude` repeats the table
-with those symbols' trades taken out of the run. It reads daily bars from data/clean,
-never on or after holdout_start.
+period: return, max drawdown and the run's excess return. An ETF run (instrument ETF)
+also gets benchmark 2, the same buy-and-hold of config/etf_proxy.yaml's `benchmark`
+series alone; both use ETF charges and the ETF base slippage tier. `--exclude` repeats
+the first table with those symbols' trades taken out of the run. It reads daily bars
+from data/clean (the ETF proxy dataset for ETF runs), never on or after holdout_start.
 Runs no backtest and logs no trial.
 
 Turnover is one-way: (rupees bought + sold) / 2 / capital. Costs are charges +
@@ -34,6 +36,7 @@ from typing import Any
 import pandas as pd
 
 from nsealgo.costs import load_cost_config
+from nsealgo.data.etf_proxy import load_etf_proxy_config
 from nsealgo.data.store import connect
 from nsealgo.engine.loader import check_holdout, load_bars, load_research_config
 from nsealgo.reporting.benchmark import buy_and_hold, without_symbols
@@ -257,39 +260,52 @@ def compare(run: pd.DataFrame, bench: pd.DataFrame, capital: float, fixed: bool)
     return out
 
 
-def benchmark_equity(trial: dict[str, Any]) -> tuple[pd.DataFrame, pd.DataFrame, str]:
-    """(daily bars of the trial's universe over its period, buy-and-hold equity, label)."""
+def benchmark_equity(trial: dict[str, Any]) -> tuple[pd.DataFrame, list[tuple[str, pd.DataFrame]]]:
+    """(daily bars of the trial's universe over its period, [(label, buy-and-hold
+    equity)]: the universe's equal weight, then for ETF runs the benchmark series)."""
+    instrument = trial.get("instrument", "EQ")  # trials before the field were equity
     start, end = (date.fromisoformat(str(trial["period"][k])) for k in ("start", "end"))
     check_holdout(end, load_research_config(), allow_holdout=False)
-    bars = load_bars(connect(), "1d", trial["universe"], start, end)
+    con = connect()
+    bars = load_bars(con, "1d", trial["universe"], start, end, instrument=instrument)
     costs = load_cost_config(COSTS_PATH)
     preset = costs.active_brokerage
-    bps = costs.slippage_bps_per_side[BENCHMARK_TIER]
+    bps = costs.slippage_table(instrument)[BENCHMARK_TIER]
     delivery = costs.brokerage_presets[preset].delivery
-    equity = buy_and_hold(bars, trial["capital"], costs.rates, delivery, bps)
-    days = pd.to_datetime(equity["session_date"])
-    label = (
-        f"benchmark: equal-weight buy-and-hold of the run's {bars['symbol'].nunique()} "
-        f"symbols, fractional shares, bought at the {days.iloc[0]:%Y-%m-%d} open with one "
-        f"{BENCHMARK_TIER}-tier buy ({preset}, {bps} bps), held to the "
-        f"{days.iloc[-1]:%Y-%m-%d} close, no rebalancing, no sell costs"
-    )
-    return bars, equity, label
+
+    def hold(b: pd.DataFrame, what: str) -> tuple[str, pd.DataFrame]:
+        equity = buy_and_hold(b, trial["capital"], costs.rates, delivery, bps, instrument)
+        days = pd.to_datetime(equity["session_date"])
+        label = (
+            f"{what}, fractional units, bought at the {days.iloc[0]:%Y-%m-%d} open with "
+            f"one {BENCHMARK_TIER}-tier {instrument} buy ({preset}, {bps} bps), held to the "
+            f"{days.iloc[-1]:%Y-%m-%d} close, no rebalancing, no sell costs"
+        )
+        return label, equity
+
+    n = bars["symbol"].nunique()
+    out = [hold(bars, f"benchmark: equal-weight buy-and-hold of the run's {n} symbols")]
+    if instrument == "ETF":
+        sym = load_etf_proxy_config().benchmark
+        b2 = load_bars(con, "1d", [sym], start, end, instrument=instrument)
+        out.append(hold(b2, f"benchmark 2: buy-and-hold of {sym}"))
+    return bars, out
 
 
 def bench_report(run_dir: Path, exclude: list[str]) -> str:
     trial = trial_for(run_dir)
     capital = trial["capital"]
     fixed = trial.get("sizing_basis", "current_equity") == "fixed_capital"
-    bars, bench, label = benchmark_equity(trial)
+    bars, benches = benchmark_equity(trial)
     equity = pd.read_parquet(run_dir / "equity.parquet")
     parts = [
         f"run: {run_dir.name} (tier {trial['cost_tier']}, sizing {trial.get('sizing_basis')})",
-        label,
         "Return and max drawdown by calendar year (in-year) and over the whole period; "
         "excess = run return - benchmark return, in percentage points",
-        md_table(compare(equity, bench, capital, fixed), COMPARE_COLS, "Year"),
     ]
+    for label, b in benches:
+        parts += [label, md_table(compare(equity, b, capital, fixed), COMPARE_COLS, "Year")]
+    bench = benches[0][1]
     if exclude:
         fills = pd.read_parquet(run_dir / "fills.parquet")
         trades = pd.read_parquet(run_dir / "trades.parquet")
