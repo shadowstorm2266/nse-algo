@@ -1,4 +1,6 @@
-"""Trading cost model for NSE equity cash: intraday (MIS) and delivery (CNC).
+"""Trading cost model for NSE equity cash: intraday (MIS) and delivery (CNC), and
+equity-ETF units on delivery (instrument "ETF": own STT and stamp rates, everything
+else as equity delivery). Equity ("EQ") is the default instrument.
 
 Pure functions on Decimal rupees. Each component is computed exactly and then
 rounded to the paisa (half-up); `total` is the sum of the rounded components.
@@ -21,6 +23,7 @@ BrokerageKind = Literal["zero", "flat_or_pct", "flat"]
 Number = Decimal | int | float | str
 PRODUCTS = ("MIS", "CNC")
 SIDES = ("BUY", "SELL")
+INSTRUMENTS = ("EQ", "ETF")
 
 
 def _dec(x: Number) -> Decimal:
@@ -75,6 +78,25 @@ class StatutoryRates:
     delivery_stt_buy_pct: Decimal
     delivery_stt_sell_pct: Decimal
     delivery_stamp_buy_pct: Decimal
+    etf_delivery_stt_buy_pct: Decimal
+    etf_delivery_stt_sell_pct: Decimal
+    etf_delivery_stamp_buy_pct: Decimal
+
+    def delivery(self, instrument: str) -> tuple[Decimal, Decimal, Decimal]:
+        """(STT buy, STT sell, stamp buy) percents for a delivery trade in `instrument`."""
+        if instrument == "EQ":
+            return (
+                self.delivery_stt_buy_pct,
+                self.delivery_stt_sell_pct,
+                self.delivery_stamp_buy_pct,
+            )
+        if instrument == "ETF":
+            return (
+                self.etf_delivery_stt_buy_pct,
+                self.etf_delivery_stt_sell_pct,
+                self.etf_delivery_stamp_buy_pct,
+            )
+        raise ValueError(f"unknown instrument {instrument!r}")
 
 
 @dataclass(frozen=True)
@@ -146,18 +168,22 @@ def delivery_round_trip(
     rates: StatutoryRates,
     brokerage: BrokerageModel,
     dp_charge_per_scrip: Number,
+    *,
+    instrument: str = "EQ",
 ) -> CostBreakdown:
     """Charges for one CNC buy and one CNC sell of a single scrip (one DP charge).
 
     `dp_charge_per_scrip` is before GST; GST is charged on it with the other fees.
+    `instrument` "ETF" uses the equity-ETF STT and stamp rates.
     """
     buy, sell = _dec(buy_value), _dec(sell_value)
     _validate_values(buy, sell)
+    stt_buy, stt_sell, stamp_buy = rates.delivery(instrument)
     return _build(
         brokerage=brokerage.per_order(buy) + brokerage.per_order(sell),
-        stt=_pct(buy, rates.delivery_stt_buy_pct) + _pct(sell, rates.delivery_stt_sell_pct),
+        stt=_pct(buy, stt_buy) + _pct(sell, stt_sell),
         turnover=buy + sell,
-        stamp=_pct(buy, rates.delivery_stamp_buy_pct),
+        stamp=_pct(buy, stamp_buy),
         dp_charge=_dec(dp_charge_per_scrip),
         rates=rates,
     )
@@ -170,16 +196,21 @@ def fill_charges(
     rates: StatutoryRates,
     brokerage: BrokerageModel,
     dp_charge: Number = 0,
+    *,
+    instrument: str = "EQ",
 ) -> CostBreakdown:
     """Charges for one executed order (one leg) of `value` rupees.
 
     `product` is "MIS" or "CNC", `side` is "BUY" or "SELL". `dp_charge` (before GST)
     is only allowed on a CNC sell; the caller decides whether this sell is the first
-    of the scrip that day. Components are rounded to the paisa per order, so the two
-    legs of a round trip can differ by a few paise from the round-trip functions.
+    of the scrip that day. `instrument` "ETF" is allowed only with CNC. Components are
+    rounded to the paisa per order, so the two legs of a round trip can differ by a
+    few paise from the round-trip functions.
     """
-    if product not in PRODUCTS or side not in SIDES:
-        raise ValueError(f"unknown product/side {product!r}/{side!r}")
+    if product not in PRODUCTS or side not in SIDES or instrument not in INSTRUMENTS:
+        raise ValueError(f"unknown product/side/instrument {product!r}/{side!r}/{instrument!r}")
+    if instrument == "ETF" and product != "CNC":
+        raise ValueError("ETF charges are modelled for delivery (CNC) only")
     v, dp = _dec(value), _dec(dp_charge)
     if v <= 0:
         raise ValueError(f"order value must be positive, got {v}")
@@ -190,8 +221,9 @@ def fill_charges(
         stt = Decimal(0) if buy else _pct(v, rates.intraday_stt_sell_pct)
         stamp = _pct(v, rates.intraday_stamp_buy_pct) if buy else Decimal(0)
     else:
-        stt = _pct(v, rates.delivery_stt_buy_pct if buy else rates.delivery_stt_sell_pct)
-        stamp = _pct(v, rates.delivery_stamp_buy_pct) if buy else Decimal(0)
+        stt_buy, stt_sell, stamp_buy = rates.delivery(instrument)
+        stt = _pct(v, stt_buy if buy else stt_sell)
+        stamp = _pct(v, stamp_buy) if buy else Decimal(0)
     return _build(
         brokerage=brokerage.per_order(v),
         stt=stt,
@@ -234,6 +266,9 @@ def load_cost_config(path: Path) -> CostConfig:
         delivery_stt_buy_pct=_dec(st["delivery"]["stt_buy_pct"]),
         delivery_stt_sell_pct=_dec(st["delivery"]["stt_sell_pct"]),
         delivery_stamp_buy_pct=_dec(st["delivery"]["stamp_buy_pct"]),
+        etf_delivery_stt_buy_pct=_dec(st["etf_delivery"]["stt_buy_pct"]),
+        etf_delivery_stt_sell_pct=_dec(st["etf_delivery"]["stt_sell_pct"]),
+        etf_delivery_stamp_buy_pct=_dec(st["etf_delivery"]["stamp_buy_pct"]),
     )
     presets = {name: _parse_preset(p) for name, p in raw["brokerage"]["presets"].items()}
     active = raw["brokerage"]["active"]

@@ -178,6 +178,75 @@ def test_cnc_legs_and_dp_only_on_sell(cfg):
         fill_charges("MIS", "SELL", 5_000, cfg.rates, p.intraday, 9)
 
 
+# --- equity-ETF units, delivery ---
+
+
+def test_etf_rates_from_config(cfg):
+    r = cfg.rates
+    assert (r.etf_delivery_stt_buy_pct, r.etf_delivery_stt_sell_pct) == (0, D("0.001"))
+    assert r.etf_delivery_stamp_buy_pct == D("0.015")
+
+
+def test_etf_10k_round_trip_shoonya_known_answer(cfg):
+    p = cfg.brokerage_presets["shoonya"]
+    cb = delivery_round_trip(
+        10_000, 10_000, cfg.rates, p.delivery, p.dp_charge_per_scrip, instrument="ETF"
+    )
+    assert cb.brokerage == D("0.00")
+    assert cb.stt == D("0.10")  # 0.001% of the 10,000 sell; nil on the buy
+    assert cb.transaction_charge == D("0.59")  # 0.00297% of 20,000 = 0.594
+    assert cb.sebi_fee == D("0.02")
+    assert cb.stamp_duty == D("1.50")  # 0.015% of the 10,000 buy
+    assert cb.dp_charge == D("9.00")
+    assert cb.gst == D("1.73")  # 18% of (0.594 + 0.02 + 9) = 1.73052
+    assert cb.total == D("12.94")
+
+
+def test_etf_10k_legs_shoonya_known_answer(cfg):
+    p = cfg.brokerage_presets["shoonya"]
+    buy = fill_charges("CNC", "BUY", 10_000, cfg.rates, p.delivery, instrument="ETF")
+    # txn 0.297, SEBI 0.01, stamp 1.50, GST 18% of 0.307 = 0.05526
+    assert (buy.stt, buy.transaction_charge, buy.sebi_fee) == (0, D("0.30"), D("0.01"))
+    assert (buy.stamp_duty, buy.gst, buy.dp_charge) == (D("1.50"), D("0.06"), 0)
+    assert buy.total == D("1.87")
+    sell = fill_charges(
+        "CNC", "SELL", 10_000, cfg.rates, p.delivery, p.dp_charge_per_scrip, instrument="ETF"
+    )
+    # STT 0.10, txn 0.297, SEBI 0.01, DP 9, GST 18% of 9.307 = 1.67526
+    assert (sell.stt, sell.transaction_charge, sell.sebi_fee) == (D("0.10"), D("0.30"), D("0.01"))
+    assert (sell.stamp_duty, sell.dp_charge, sell.gst) == (0, D("9.00"), D("1.68"))
+    assert sell.total == D("11.09")
+
+
+def test_etf_equity_default_unchanged(cfg):
+    # The equity path is the default and does not change with the ETF block.
+    p = cfg.brokerage_presets["shoonya"]
+    eq = delivery_round_trip(5_000, 5_000, cfg.rates, p.delivery, p.dp_charge_per_scrip)
+    assert eq == delivery_round_trip(
+        5_000, 5_000, cfg.rates, p.delivery, p.dp_charge_per_scrip, instrument="EQ"
+    )
+    assert eq.total == D("21.74")
+
+
+def test_etf_only_on_delivery_and_known_instruments(cfg):
+    with pytest.raises(ValueError):
+        fill_charges("MIS", "BUY", 1_000, cfg.rates, cfg.broker.intraday, instrument="ETF")
+    with pytest.raises(ValueError):
+        fill_charges("CNC", "BUY", 1_000, cfg.rates, cfg.broker.delivery, instrument="GOLD")
+    with pytest.raises(ValueError):
+        delivery_round_trip(1_000, 1_000, cfg.rates, cfg.broker.delivery, 9, instrument="etf")
+
+
+@given(buy=values, sell=values, preset=st.sampled_from(["zero", "shoonya", "dhan"]))
+def test_etf_differs_from_equity_only_in_stt(cfg, buy, sell, preset):
+    p = cfg.brokerage_presets[preset]
+    args = (buy, sell, cfg.rates, p.delivery, p.dp_charge_per_scrip)
+    etf, eq = delivery_round_trip(*args, instrument="ETF"), delivery_round_trip(*args)
+    assert astuple(etf)[:-1] == (eq.brokerage, etf.stt, *astuple(eq)[2:-1])
+    assert etf.stt <= eq.stt
+    assert etf.total == sum(astuple(etf)[:-1])
+
+
 @pytest.mark.parametrize(("product", "side"), [("NRML", "BUY"), ("MIS", "HOLD")])
 def test_fill_charges_rejects_unknown_product_or_side(cfg, product, side):
     with pytest.raises(ValueError):

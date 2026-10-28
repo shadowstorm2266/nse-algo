@@ -12,6 +12,18 @@ statutory:
     stt_buy_pct: 0.1
     stt_sell_pct: 0.1
     stamp_buy_pct: 0.015
+  # Units of equity-oriented ETFs, delivery (CNC) only. Transaction charge, SEBI fee and
+  # GST as for equity; brokerage and DP charge from the active preset's delivery entry.
+  etf_delivery:
+    # STT: NSE circular NSE/FATAX/73524 (31 Mar 2026), rates from 1 Apr 2026: row 2A,
+    # sale of a unit of an equity oriented fund on delivery 0.001%, seller (no change).
+    # No row for buying such a unit, so nil on buy.
+    stt_buy_pct: 0
+    stt_sell_pct: 0.001
+    # Stamp: NSE's stamp duty table, "transfer of security other than debenture on
+    # delivery basis" 0.015%, buyer. Indian Stamp Act s.2(23A)(i) takes "securities"
+    # from SCRA s.2(h), which includes units issued under any mutual fund scheme.
+    stamp_buy_pct: 0.015
 
 brokerage:
   # Brokerage is charged per executed order (each leg), separately for
