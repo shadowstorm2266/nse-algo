@@ -335,3 +335,6 @@ Run dirs (local, not committed):
 
 The by-tier year tables, sessions held and time in market were computed from those
 directories' parquet files and the calendar (one-off script, not in the repo).
+
+Status: fails first-pass checks 2 and 3; parked. Research phase ended per the
+pre-registered rule.

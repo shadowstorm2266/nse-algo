@@ -122,8 +122,8 @@ Final equity: swing Rs 37,552, benchmark Rs 89,114.
 | Holdout | net positive, once | not run | not run |
 | P(15% DD within 250 days) | < 10% | not computed | not computed |
 
-The DSR trial count was 13 (7 ORB, 6 swing) when these tables were made. It is now 17,
-with pullback trials 14-17.
+The DSR trial count was 13 (7 ORB, 6 swing) when these tables were made. It is now 21,
+with pullback trials 14-17 and sector_rotation trials 18-21.
 
 ## Caveats that differ between the tracks
 
@@ -160,3 +160,9 @@ with pullback trials 14-17.
   parked" (owner's decision, 2026-10-28). No fixed-capital run: the reference tier (no
   brokerage, no slippage) already loses, -7.6 bps/trade (trial 14). Not in the tables
   above; details in `research/strategy3_result.md`.
+- Sector rotation v1 (strategy 4, swing track, CNC on 11 sector-ETF proxies, trials
+  18-21): "fails first-pass checks 2 and 3; parked. Research phase ended per the
+  pre-registered rule." (owner's decision, 2026-10-31). Base tier (trial 19): +118.0%
+  total return vs +222.6% for equal-weight buy-and-hold of the 11 series and +201.2%
+  for PX_NIFTY50. Not in the tables above; details in `research/strategy4_result.md`,
+  rule in `research/strategy4_plan.md` section 2.
