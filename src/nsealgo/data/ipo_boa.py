@@ -47,6 +47,7 @@ class RetailBoa:
     retail_shares_allotted: int | None
     retail_allottees: int | None
     retail_valid_applications: int | None  # the table's TOTAL row
+    retail_shares_applied: int | None  # the same TOTAL row
     min_bid_shares: int | None
     min_bid_applications: int | None
     min_bid_ratio_num: int | None
@@ -124,8 +125,8 @@ def one_lot_row(rows: list[BoaRow], lot: int | None = None) -> BoaRow | None:
 
 def table_rows(
     section: str, lot: int | None = None, smallest_total: bool = False
-) -> tuple[list[BoaRow], int | None]:
-    """Accepted rows and the retail TOTAL row's application count (None if not found).
+) -> tuple[list[BoaRow], tuple[int, int] | None]:
+    """Accepted rows and the retail TOTAL row's (applications, shares applied), or None.
     A TOTAL line counts only if it reads 'applications, 100, shares applied' and fits the
     accepted rows: at least the 1-lot row's applications, and at least one lot per
     application (other tables in the section have TOTAL lines too). The first such line
@@ -148,7 +149,7 @@ def table_rows(
     if first is None:
         return rows, None
     fits = [
-        apps
+        (apps, applied)
         for apps, applied in totals
         if apps >= first.applications and applied >= apps * first.category_shares
     ]
@@ -246,7 +247,8 @@ def parse_retail_boa(prose_text: str, table_text: str, lot: int | None = None) -
         first = one_lot_row(rows, lot)
     return RetailBoa(
         **fields,
-        retail_valid_applications=total,
+        retail_valid_applications=total[0] if total else None,
+        retail_shares_applied=total[1] if total else None,
         min_bid_shares=first.category_shares if first else None,
         min_bid_applications=first.applications if first else None,
         min_bid_ratio_num=first.ratio_num if first else None,

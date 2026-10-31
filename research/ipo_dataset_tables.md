@@ -1,6 +1,6 @@
 # Mainboard IPO dataset: tables
 
-Generated 2026-10-31 17:33 UTC by `scripts/report_ipo.py` from `data/clean/ipo/ipos.parquet` (584 rows). Years are calendar years of the bid close. Returns are gross (no charges, no retail discount). Narrative and caveats: `research/ipo_dataset.md`.
+Generated 2026-10-31 19:26 UTC by `scripts/report_ipo.py` from `data/clean/ipo/ipos.parquet` (584 rows). Years are calendar years of the bid close. Returns are gross (no charges, no retail discount). Narrative and caveats: `research/ipo_dataset.md`.
 
 ## 1. Issues per year, by status
 
@@ -24,7 +24,7 @@ Generated 2026-10-31 17:33 UTC by `scripts/report_ipo.py` from `data/clean/ipo/i
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | 2016 | 26 | 0 | 0 | 26 | 26 | 26 | 26 | 26 | 26 | 3 | 3 | 0 | 0 |
 | 2017 | 36 | 0 | 0 | 36 | 36 | 36 | 36 | 36 | 36 | 4 | 3 | 0 | 0 |
-| 2018 | 24 | 0 | 0 | 22 | 22 | 22 | 22 | 22 | 22 | 2 | 2 | 0 | 0 |
+| 2018 | 24 | 0 | 0 | 22 | 22 | 22 | 22 | 22 | 22 | 3 | 2 | 0 | 0 |
 | 2019 | 16 | 0 | 0 | 2 | 2 | 2 | 2 | 3 | 2 | 1 | 1 | 0 | 0 |
 | 2020 | 14 | 0 | 0 | 3 | 2 | 3 | 3 | 6 | 2 | 0 | 0 | 0 | 0 |
 | 2021 | 63 | 0 | 0 | 5 | 5 | 8 | 8 | 26 | 5 | 1 | 0 | 0 | 0 |
@@ -46,10 +46,10 @@ Generated 2026-10-31 17:33 UTC by `scripts/report_ipo.py` from `data/clean/ipo/i
 | boa_min_bid | 0 | 15 | 0 | 0 | 0 |
 | isin | 0 | 0 | 0 | 0 | 487 |
 | min_bid_ratio | 0 | 0 | 0 | 420 | 0 |
-| none | 0 | 12 | 15 | 140 | 0 |
+| none | 0 | 12 | 16 | 140 | 0 |
 | nse_boa | 0 | 0 | 445 | 0 | 0 |
 | nse_detail | 0 | 544 | 0 | 0 | 0 |
-| nse_detail_bids | 0 | 0 | 111 | 0 | 0 |
+| nse_detail_bids | 0 | 0 | 110 | 0 | 0 |
 | nse_list(base_disagrees) | 1 | 0 | 0 | 0 | 0 |
 | nse_list=bhavcopy_base | 548 | 0 | 0 | 0 | 0 |
 | retail_undersubscribed | 0 | 0 | 0 | 2 | 0 |
@@ -126,6 +126,7 @@ Generated 2026-10-31 17:33 UTC by `scripts/report_ipo.py` from `data/clean/ipo/i
 | PNBHF_20161025 | PNB Housing Finance Limited | issue_price_list_vs_base |
 | RADIOCITY_20170306 | Music Broadcast Limited | issue_price_list_vs_base |
 | AUBANK_20170628 | AU Small Finance Bank Limited | issue_price_list_vs_base |
+| HGINFRA_20180226 | H.G.Infra Engineering Limited | exch_snapshot_before_close |
 | ISEC_20180322 | ICICI Securities Limited | issue_price_list_vs_base |
 | INDOSTAR_20180509 | IndoStar Capital Finance Limited | issue_price_list_vs_base |
 | CREDITACC_20180808 | CreditAccess Grameen Limited | issue_price_list_vs_base |
@@ -142,6 +143,7 @@ Generated 2026-10-31 17:33 UTC by `scripts/report_ipo.py` from `data/clean/ipo/i
 | SIGACHI_20211101 | Sigachi Industries Limited | boa_unreadable |
 | SJS_20211101 | S J S Enterprises Limited | boa_no_retail_section |
 | HPAL_20211215 | HP Adhesives Limited | boa_unreadable |
+| AWL_20220127 | Adani Wilmar Limited | exch_snapshot_before_close |
 | UMAEXPORTS_20220328 | UMA Exports Limited | boa_no_retail_section |
 | DCX_20221031 | DCX System limited | issue_price_list_vs_base |
 | ACI_20221109 | Archean Chemical Industries Limited | boa_unreadable |

@@ -58,6 +58,7 @@ ISSUE_COLS = [
     "retail_shares_bid_exch",
     "retail_sub_exch",
     "total_sub_exch",
+    "exch_snapshot_before_close",
     "meta_isin",
     "meta_listing_date",
 ]
@@ -92,6 +93,21 @@ def parse_long_date(text: str) -> date | None:
     if len(months) != 1 or len(days) != 1 or len(years) != 1:
         return None
     return date(years[0], months[0], days[0])
+
+
+def parse_snapshot_date(text: str | None) -> date | None:
+    """Date of the bid book's 'updateTime' stamp: 'Updated as on 11-Sep-2024 19:00:00',
+    'Updated as on 09th Dec 2021 at 1700 hrs' -> date; 'Updated as on null', '' or None ->
+    None."""
+    s = re.sub(r"^\s*Updated\s+as\s+on\s*", "", text or "", flags=re.I).strip()
+    if s.lower() in ("", "null"):
+        return None
+    if m := re.match(r"(\d{1,2}-[A-Za-z]{3,9}-\d{4})\b", s):
+        return parse_nse_date(m[1])
+    day = parse_long_date(re.split(r"\bat\b", s, maxsplit=1)[0])
+    if day is None:
+        raise ValueError(f"unparseable snapshot stamp {text!r}")
+    return day
 
 
 def _number(text: str) -> float:
@@ -197,15 +213,19 @@ def _issue_price(text: str | None) -> float | None:
     return None if s in ("", "-") else _number(s)
 
 
-def _detail_fields(detail: Mapping | None, open_date: date) -> dict:
+def _detail_fields(detail: Mapping | None, open_date: date, close_date: date) -> dict:
     """Fields taken from the per-issue JSON, or {'detail_used': False} if it is another
-    attempt's (bid period not starting on `open_date`) or missing."""
+    attempt's (bid period not starting on `open_date`) or missing. A bid book stamped
+    before `close_date` is an intraday snapshot (Adani Wilmar 2022: day 1, 12:27), not the
+    close: its bids and times are dropped and flagged; the reserved shares are kept."""
     info = issue_info(detail or {})
     period = parse_issue_period(info.get("Issue Period"))
     if detail is None or period is None or period[0] != open_date:
         return {"detail_used": False}
     retail = category_bids(detail, "Retail Individual")
     total = category_bids(detail, "Total")
+    stamp = parse_snapshot_date((detail.get("activeCat") or {}).get("updateTime"))
+    early = stamp is not None and stamp < close_date
     meta = detail.get("metaInfo") or {}
     lot = parse_lot(info.get("Bid Lot")) or parse_lot(info.get("Minimum Order Quantity"))
     return {
@@ -213,9 +233,10 @@ def _detail_fields(detail: Mapping | None, open_date: date) -> dict:
         "lot_size": lot,
         "registrar": info.get("Name of the Registrar") or None,
         "retail_shares_offered_exch": retail[0] if retail else None,
-        "retail_shares_bid_exch": retail[1] if retail else None,
-        "retail_sub_exch": retail[2] if retail else None,
-        "total_sub_exch": total[2] if total else None,
+        "retail_shares_bid_exch": retail[1] if retail and not early else None,
+        "retail_sub_exch": retail[2] if retail and not early else None,
+        "total_sub_exch": total[2] if total and not early else None,
+        "exch_snapshot_before_close": early,
         "meta_isin": meta.get("isin") or None,
         "meta_listing_date": parse_nse_date(meta.get("listingDate")),
     }
@@ -289,7 +310,7 @@ def issues_frame(list_rows: Iterable[Mapping], details: Mapping[str, Mapping]) -
             "list_status": kind,
             "list_row_overwritten": bool(r.get("overwritten", False)),
         }
-        out.append(row | _detail_fields(details.get(sym), open_date))
+        out.append(row | _detail_fields(details.get(sym), open_date, close_date))
     df = pd.DataFrame(out).reindex(columns=ISSUE_COLS)
     if df["issue_id"].duplicated().any():
         raise ValueError(f"duplicate issue ids: {df.loc[df['issue_id'].duplicated(), 'issue_id']}")

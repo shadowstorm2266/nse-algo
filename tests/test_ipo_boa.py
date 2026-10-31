@@ -41,6 +41,7 @@ def test_retail_boa_fields_from_a_synthetic_advert():
     assert r.retail_sub_boa == pytest.approx(7.53726)
     assert (r.retail_shares_allotted, r.retail_allottees) == (293_000_000, 1_369_158)
     assert r.retail_valid_applications == 5_865_849
+    assert r.retail_shares_applied == 2_208_417_298  # the same TOTAL row
     assert (r.min_bid_shares, r.min_bid_applications) == (214, 4_738_356)
     assert (r.min_bid_ratio_num, r.min_bid_ratio_den, r.min_bid_allotted_shares) == (496, 2125, 214)
     assert (r.retail_offer_price, r.retail_discount) == (70.0, 2.0)
@@ -149,6 +150,22 @@ def test_allottee_sentence_with_a_spillover_note_and_total_row_must_fit_the_rows
     table = TABLE.replace("   TOTAL ", "   TOTAL  2,671   100.00   9,000\n   TOTAL ", 1)
     r = parse_retail_boa(prose, table)
     assert r.retail_allottees == 1_369_158 and r.retail_valid_applications == 5_865_849
+    assert r.retail_shares_applied == 2_208_417_298  # not the other table's 9,000
+
+
+def test_a_dropped_one_lot_row_takes_its_total_row_shares_applied_with_it():
+    from nsealgo.data.ipo_build import _validated
+
+    b = {
+        "min_bid_applications": 65,
+        "min_bid_shares": 36,
+        "retail_shares_allotted": 4_981_433,
+        "retail_valid_applications": 70,
+        "retail_shares_applied": 17_800_000,
+    }
+    out, row_ok, _ = _validated(b, 3.58)
+    assert not row_ok
+    assert out["retail_valid_applications"] is None and out["retail_shares_applied"] is None
 
 
 def test_unreadable_text_is_detected():

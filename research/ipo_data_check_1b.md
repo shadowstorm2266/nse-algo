@@ -169,3 +169,19 @@ after the 17:00 cutoff), `retail_sub_boa` and `retail_sub`, every basis-of-allot
    a test and a rebuild. Or leave it as is and note it.
 
 Status: data check only. No strategy, backtest or trial was run.
+
+## 9. Owner's decisions (2026-11-01)
+
+1. **Cutoff:** 17:00 on the last bid day for every issue, including 2019 to Aug 2022.
+2. **Subscription:** the first test uses only pre-bid fields (a). Live paper-tracking will
+   record NSE's own figures at the end of each bid day from 1 Nov 2026, built in a later
+   step (c). News snapshots (b) are skipped.
+3. **Adani Wilmar:** fixed. A JSON bid book stamped before the bid close loses its bids and
+   multiples and is flagged `exch_snapshot_before_close` (`nsealgo.data.ipo`, with tests).
+   The rebuild found a second case, H.G. Infra 2018 (no advert, so it now has no retail
+   multiple). See `research/ipo_dataset.md` section 4.
+4. **Working day** = NSE trading day. Bank holidays can differ.
+5. **k:** the mix of after-rejection (advert TOTAL row) and before-rejection
+   (`retail_sub_exch`) figures is accepted. Issues using it are flagged, and results are
+   also reported without them. The TOTAL row's shares applied are now kept as
+   `retail_shares_applied`, so k = shares applied / lot / valid applications.

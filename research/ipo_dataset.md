@@ -23,7 +23,7 @@ a judgement of the IPO track. The owner decides what comes next.
 | Name, list symbol, bid open/close, price band | NSE past-issue list (`/api/public-past-issues`) | PRIMARY | 571 of 571 |
 | Issue price | NSE list price, accepted when it equals the listing-day bhavcopy base price; else whichever of the two lies in the band | PRIMARY | 571 (548 both agree) |
 | Lot size | NSE per-issue JSON "Bid Lot", else the advert's 1-lot category | PRIMARY | 559 (12 missing: 8 in 2016-2018) |
-| Retail subscription, exchange bid book at close | NSE per-issue JSON, consolidated category bids | PRIMARY | 526 |
+| Retail subscription, exchange bid book at close | NSE per-issue JSON, consolidated category bids | PRIMARY | 524 (2 dropped: snapshot stamped before the close, section 4) |
 | Retail subscription after rejections | advert: "subscribed to the extent of X times" | PRIMARY | 445 |
 | Valid retail applications | advert: retail table TOTAL row | PRIMARY | 358 |
 | Successful retail allottees, shares allotted | advert: "... Equity Shares to N successful ..." | PRIMARY | 427 |
@@ -100,7 +100,7 @@ Published counts for comparison (UNVERIFIED, phase-2 report section 1.2): 2021 P
 |---|---|---|---|---|---|---|---|---|
 | 2016 | 26 | 3 | 3 | 26 | 26 | 26 | 26 | 26 |
 | 2017 | 36 | 3 | 4 | 36 | 36 | 36 | 36 | 36 |
-| 2018 | 24 | 2 | 2 | 22 | 22 | 22 | 22 | 22 |
+| 2018 | 24 | 2 | 3 | 22 | 22 | 22 | 22 | 22 |
 | 2019 | 16 | 1 | 1 | 2 | 3 | 2 | 2 | 2 |
 | 2020 | 14 | 0 | 0 | 2 | 6 | 3 | 2 | 3 |
 | 2021 | 63 | 0 | 1 | 5 | 26 | 8 | 5 | 5 |
@@ -226,6 +226,11 @@ independent list to check against.
 read 29 adverts by hand last session; 14 of their rows parse into a comparable form. Every
 value that could be compared agrees (subscription to 2 decimals, applications, allottees,
 1-lot ratio); the only differences are the notes' rounding (Hyundai 0.44 against 0.44206).
+
+**Exchange snapshots stamped before the close** (fixed 2026-11-01, owner's decision 3 of step 1b):
+NSE's JSON kept an intraday bid book for Adani Wilmar 2022 (day 1, 12:27) and H.G. Infra
+2018. Their exchange bids and multiples are dropped and flagged `exch_snapshot_before_close`;
+Adani Wilmar keeps the advert's 3.32, H.G. Infra (no advert) now has no retail multiple.
 
 **Internal checks on every row** (`checks` column; `docs/data.md`). Besides those in 3.2:
 the bhavcopy base price disagrees with NSE's list price for 23 listed issues. 17 are the

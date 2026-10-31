@@ -13,6 +13,7 @@ from nsealgo.data.ipo import (
     parse_lot,
     parse_nse_date,
     parse_price_range,
+    parse_snapshot_date,
 )
 from nsealgo.data.ipo_listing import BHAV_COLS, first_seen, listings_frame
 
@@ -135,6 +136,47 @@ def test_issues_frame_dedupes_keeps_withdrawn_twin_and_uses_matching_json_only()
     assert rsl["detail_used"] and rsl["lot_size"] == 40 and rsl["retail_sub_exch"] == 7.04
     assert rsl["total_sub_exch"] == 20.0 and rsl["meta_isin"] == "INE000A01011"
     assert not df.loc["AWH", "detail_used"] and pd.isna(df.loc["AWH", "lot_size"])
+
+
+def test_snapshot_stamps_in_every_format_seen():
+    assert parse_snapshot_date("Updated as on 11-Sep-2024 19:00:00") == date(2024, 9, 11)
+    assert parse_snapshot_date("Updated as on 09-Sept-2024 19:00:00") == date(2024, 9, 9)
+    assert parse_snapshot_date("Updated as on 09th Dec 2021 at 1700 hrs") == date(2021, 12, 9)
+    assert parse_snapshot_date("Updated as on 13th December 2021 at 1700 hrs") == date(2021, 12, 13)
+    assert parse_snapshot_date("Updated as on 1st Nov 2021 at 1700 hrs") == date(2021, 11, 1)
+    assert parse_snapshot_date("Updated as on null") is None
+    assert parse_snapshot_date("") is None and parse_snapshot_date(None) is None
+    with pytest.raises(ValueError):
+        parse_snapshot_date("Updated as on sometime")
+
+
+def test_exchange_bids_stamped_before_the_close_are_dropped():
+    # ADANI WILMAR 2022: the JSON kept a day-1 12:27 snapshot of a 27-31 Jan book
+    rows = [
+        _row("EARLY", "Early Ltd", start="27-JAN-2022", end="31-JAN-2022"),
+        _row("CLOSE", "Close Ltd", start="27-JAN-2022", end="31-JAN-2022"),
+        _row("NULL", "Null Ltd", start="27-JAN-2022", end="31-JAN-2022"),
+    ]
+
+    def stamped(text):
+        d = _detail("27-Jan-2022 to 31-Jan-2022")
+        d["activeCat"]["updateTime"] = text
+        return d
+
+    details = {
+        "EARLY": stamped("Updated as on 27-Jan-2022 12:27:00"),
+        "CLOSE": stamped("Updated as on 31-Jan-2022 17:00:00"),
+        "NULL": stamped("Updated as on null"),
+    }
+    df = issues_frame(rows, details).set_index("list_symbol")
+    early = df.loc["EARLY"]
+    assert early["exch_snapshot_before_close"]
+    assert pd.isna(early["retail_sub_exch"]) and pd.isna(early["total_sub_exch"])
+    assert pd.isna(early["retail_shares_bid_exch"])
+    assert early["retail_shares_offered_exch"] == 1000  # the reserved size is kept
+    for sym in ("CLOSE", "NULL"):
+        assert not df.loc[sym, "exch_snapshot_before_close"]
+        assert df.loc[sym, "retail_sub_exch"] == 7.04
 
 
 def test_conflicting_list_rows_without_a_withdrawn_twin_fail():

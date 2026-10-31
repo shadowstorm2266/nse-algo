@@ -143,11 +143,13 @@ entry: CAMS 2020, listed on BSE only).
   from the per-issue JSON, else the advert's 1-lot category (`lot_size_src`).
   `lot_value_at_cap` = lot x upper band. `retail_discount` (Rs per share) from the advert.
 - **Subscription.** `retail_sub_exch`: consolidated retail bids / retail shares at the
-  close of bidding (NSE JSON, before rejections). `retail_sub_boa`: the advert's "subscribed
+  close of bidding (NSE JSON, before rejections). A JSON bid book stamped before the
+  bid close is an intraday snapshot: its bids and multiples are dropped and the row is
+  flagged `exch_snapshot_before_close` (Adani Wilmar 2022, H.G. Infra 2018). `retail_sub_boa`: the advert's "subscribed
   to the extent of" figure (after rejections). `retail_sub` is the advert's figure where
   there is one, else the exchange figure (`retail_sub_src`).
 - **Retail basis of allotment** (advert, `nsealgo.data.ipo_boa`): `retail_valid_applications`
-  (TOTAL row), `retail_allottees` and `retail_shares_allotted` ("... Equity Shares to N
+  and `retail_shares_applied` (TOTAL row), `retail_allottees` and `retail_shares_allotted` ("... Equity Shares to N
   successful ..."), `retail_lots_allotted` = shares / lot, `min_bid_applications` and
   `min_bid_ratio` (the 1-lot row: the row with NSE's lot as its category and the most
   applications). `p_1lot` (`p_1lot_method`): that row's ratio when it allots one lot; else

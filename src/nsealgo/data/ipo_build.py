@@ -146,6 +146,7 @@ CLEAN_COLS = [
     "retail_sub_exch",
     "retail_sub_boa",
     "retail_valid_applications",
+    "retail_shares_applied",
     "retail_allottees",
     "retail_shares_allotted",
     "retail_lots_allotted",
@@ -177,6 +178,7 @@ BOA_KEYS = (
     "retail_shares_allotted",
     "retail_allottees",
     "retail_valid_applications",
+    "retail_shares_applied",
     "min_bid_shares",
     "min_bid_applications",
     "retail_offer_price",
@@ -193,6 +195,7 @@ ONE_LOT_KEYS = (
     "min_bid_ratio_den",
     "min_bid_allotted_shares",
     "retail_valid_applications",
+    "retail_shares_applied",
 )
 
 
@@ -247,6 +250,8 @@ def _boa_checks(r: dict) -> list[str]:
         bad.append("p_outside_subscription_bounds")
     if not r["allottees_plausible"]:
         bad.append("boa_allottees_implausible")
+    if r["exch_snapshot_before_close"] is True:
+        bad.append("exch_snapshot_before_close")  # its bids and times were dropped (ipo.py)
     if r["boa_file"] and not r["boa_readable"]:
         bad.append("boa_unreadable")
     elif r["boa_file"] and not r["boa_parsed"]:
