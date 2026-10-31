@@ -6,7 +6,7 @@ IMPORTANT: This code will eventually place real orders with real money. Correctn
 
 ## Hard rules (YOU MUST follow every one)
 
-1. **Segments.** NSE equity cash only: intraday (MIS) and delivery (CNC) for the swing track. Never write code that trades F&O, currency or commodity.
+1. **Segments.** NSE equity cash only: intraday (MIS) and delivery (CNC) for the swing track. Never write code that trades F&O, currency or commodity. IPO applications are manual (UPI) and will never be automated; researching and simulating them here is allowed.
 2. **Live mode is human-only.** Default mode is `backtest`. `paper` requires `MODE=paper`. `live` requires ALL of: `MODE=live` in `.env`, a `LIVE_ARMED` file in the repo root, and `live_enabled: true` in `config/risk.yaml`. Never create `LIVE_ARMED`, never set `MODE=live`, never flip `live_enabled`, never run live mode. Only the human does these.
 3. **Secrets.** Load credentials only through `src/nsealgo/settings.py` (pydantic-settings reading `.env`). Never read, print, log or commit `.env`. Keep `.env.example` current with placeholder values only.
 4. **No look-ahead.** A bar is visible to a strategy only after its end time. A signal computed on bar T fills no earlier than bar T+1's open. Daily features (previous-day high/low, ATR, average volume, betas) use data strictly before the current session.

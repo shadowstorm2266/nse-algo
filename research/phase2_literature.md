@@ -5,7 +5,8 @@ was run and no trial was logged.** `research/trials.jsonl` was not touched. The 
 continues from 21 (7 ORB, 6 swing, 4 pullback, 4 sector_rotation); the next logged run would be
 trial 22. Numbers only. The owner decides.
 
-- **Compiled:** 2026-10-31, from seven research-note files that are not committed. Every source
+- **Compiled:** 2026-10-31, from seven research-note files, committed under
+  `research/phase2_notes/` (parsed allotment tables and per-event arithmetic kept). Every source
   below is the original URL, not a notes file.
 - **Question:** which edges in Indian markets can a resident individual with Rs 20,000 capture
   after all costs and taxes, specifically where being small helps?
@@ -24,6 +25,12 @@ trial 22. Numbers only. The owner decides.
   below cover dates on or after it (2025-2026 IPO listings, factor-fund NAVs to 30 Oct 2026,
   the 2025-2026 index reviews). No backtest touched those dates, but the owner has now seen
   them; a rule designed after reading them is not blind to the holdout period.
+- **Holdout for the IPO track (owner's decision, 2026-10-31).** Published IPO figures dated after
+  2025-04-08 have now been seen, so the holdout is contaminated for IPOs. For the IPO track, the
+  true out-of-sample test is paper-tracking every new mainboard IPO from 1 Nov 2026 onward.
+- **Scope (owner's decision, 2026-10-31).** The trading bot stays NSE equity cash only. IPO
+  applications are manual (UPI) and will never be automated; researching and simulating them in
+  this repo is allowed (hard rule 1 in `CLAUDE.md`).
 
 ## 0. What the four failed strategies say about where to look
 
@@ -60,7 +67,7 @@ What phase 2 looks for, given those failures:
 - **Scope.** IPO bids go through the exchange bidding platform with a UPI mandate, and tenders
   through the exchange acquisition window. Neither is a CNC or MIS order in the current engine,
   and broker-API support for either was not researched. Whether they fit hard rule 1 is the
-  owner's call.
+  owner's call. (IPOs decided 2026-10-31: manual applications only; see the header.)
 
 ## Read this first
 
@@ -1081,7 +1088,8 @@ listed whether or not it changes a number.
   the mainboard one-PAN rejection circular, the UPI Rs 5 lakh circular and the 2012 call-auction
   circular number (01 or 02/2012) not confirmed.
 - No data on listing-day auction depth or failures; no verifiable grey-market history.
-- Broker-API support for IPO bids, and whether bids fit hard rule 1, not researched.
+- Broker-API support for IPO bids not researched; not needed, since applications stay manual
+  (owner's decision, 2026-10-31).
 
 **SME IPO**
 - e-Gazette copy of GN/2025/233 not opened; Board minutes not checked.
