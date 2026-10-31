@@ -1,0 +1,31 @@
+issue_id,company,listing_date,issue_price,list_open_nse,total_sub_exch,agg_name,agg_listing_date,agg_issue_price,agg_listing_price,agg_subscription,agg_file,date_match,price_match,open_gap_pct
+BANDHANBNK_20180315,Bandhan Bank Limited,2018-03-27,375.0,499.0,14.63,Bandhan Bank,2018-03-27,375.0,485.0,,ipo_listing_gains_2018.md,True,True,-2.8056112224448926
+HAL_20180316,Hindustan Aeronautics Limited,2018-03-28,1215.0,1152.0,0.99,Hindustan Aeronautics,2018-03-28,1215.0,1169.0,,ipo_listing_gains_2018.md,True,True,1.475694444444442
+AFFLE_20190729,Affle India Limited,2019-08-08,745.0,926.0,86.49,Affle India,2019-08-08,745.0,929.9,,ipo_listing_gains_2019.md,True,True,0.42116630669546407
+VISHWARAJ_20190930,Vishwaraj Sugar Industries Limited,2019-10-15,60.0,61.2,,Vishwaraj Sugar Industries,2019-10-15,60.0,61.2,,ipo_listing_gains_2019.md,True,True,0.0
+NURECA_20210215,Nureca Limited,2021-02-25,400.0,615.0,39.93018311281076,Nureca Limited,2021-02-25,400.0,634.95,,ipo_listing_gains_2021.md,True,True,3.243902439024393
+MTARTECH_20210303,MTAR Technologies Limited,2021-03-15,575.0,1050.0,0.0,MTAR Technologies,2021-03-15,575.0,1063.9,,ipo_listing_gains_2021.md,True,True,1.323809523809527
+DATAPATTNS_20211214,Data Patterns (India) Limited,2021-12-24,585.0,856.05,119.62,Data Patterns,2021-12-24,585.0,864.0,,ipo_listing_gains_2021.md,True,True,0.9286840721920431
+VENUSPIPES_20220511,Venus Pipes and Tubes Limited,2022-05-24,326.0,337.5,16.314789716192454,Venus Pipes and Tubes,2022-05-24,326.0,335.0,,ipo_listing_gains_2022.md,True,True,-0.7407407407407418
+TMB_20220905,Tamilnad Mercantile Bank Limited,2022-09-15,510.0,495.0,2.862636822773186,Tamilnad Mercantile Bank,2022-09-15,510.0,510.0,,ipo_listing_gains_2022.md,True,True,3.0303030303030276
+MEDANTA_20221103,Global Health Limited,2022-11-16,336.0,401.0,9.584139384208303,Global Health,2022-11-16,336.0,398.15,,ipo_listing_gains_2022.md,True,True,-0.7107231920199575
+MVGJL_20230922,Manoj Vaibhav Gems N Jewellers Limited,2023-10-03,215.0,215.0,2.248404063563793,Manoj Vaibhav Gems 'N' Jewellers,2023-10-03,215.0,215.0,,ipo_listing_gains_2023.md,True,True,0.0
+AZAD_20231220,Azad Engineering Limited,2023-12-28,524.0,720.0,80.65131484124056,Azad Engineering,2023-12-28,524.0,710.0,,ipo_listing_gains_2023.md,True,True,-1.388888888888884
+JYOTICNC_20240109,Jyoti CNC Automation Limited,2024-01-16,331.0,370.0,38.53024464926129,Jyoti CNC Automation,2024-01-16,331.0,372.0,,ipo_listing_gains_2024.md,True,True,0.540540540540535
+INTERARCH_20240819,Interarch Building Products Limited,2024-08-26,900.0,1299.0,93.52983096330983,Interarch Building Products,2024-08-26,900.0,1291.2,,ipo_listing_gains_2024.md,True,True,-0.6004618937644257
+TOLINS_20240909,Tolins Tyres Limited,2024-09-16,226.0,228.0,23.89391552663249,Tolins Tyres,2024-09-16,226.0,227.0,,ipo_listing_gains_2024.md,True,True,-0.43859649122807154
+NIVABUPA_20241107,Niva Bupa Health Insurance Company Limited,2024-11-14,74.0,78.14,1.8013325604947665,Niva Bupa Health Insurance Company,2024-11-14,74.0,78.5,,ipo_listing_gains_2024.md,True,True,0.4607115433836739
+TRANSRAILL_20241219,Transrail Lighting Limited,2024-12-27,432.0,590.0,80.7976789395104,Transrail Lighting,2024-12-27,432.0,585.15,,ipo_listing_gains_2024.md,True,True,-0.8220338983050857
+CARRARO_20241220,Carraro India Limited,2024-12-30,704.0,651.0,1.1160419772707475,Carraro India,2024-12-30,704.0,660.0,,ipo_listing_gains_2024.md,True,True,1.382488479262678
+AGARWALEYE_20250129,Dr. Agarwal's Health Care Limited,2025-02-04,402.0,402.0,1.554723173553304,Dr Agarwal's Health Care,2025-02-04,402.0,396.9,,ipo_listing_gains_2025.md,True,True,-1.2686567164179152
+BORANA_20250520,Borana Weaves Limited,2025-05-27,216.0,243.0,148.78000339887413,Borana Weaves,2025-05-27,216.0,243.0,,ipo_listing_gains_2025.md,True,True,0.0
+HILINFRA_20250805,Highway Infrastructure Limited,2025-08-12,70.0,115.0,300.61396694867045,Highway Infrastructure,2025-08-12,70.0,117.0,,ipo_listing_gains_2025.md,True,True,1.7391304347825987
+GEMAROMA_20250819,Gem Aromatics Limited,2025-08-26,325.0,333.1,30.27031423798115,Gem Aromatics,2025-08-26,325.0,325.0,,ipo_listing_gains_2025.md,True,True,-2.4317021915340797
+FABTECH_20250929,Fabtech Technologies Limited,2025-10-07,191.0,192.0,2.0333955223880595,Fabtech Technologies,2025-10-07,191.0,191.0,,ipo_listing_gains_2025.md,True,True,-0.520833333333337
+STUDDS_20251030,Studds Accessories Limited,2025-11-07,585.0,565.0,73.25052235810097,Studds Accessories,2025-11-07,585.0,570.0,,ipo_listing_gains_2025.md,True,True,0.8849557522123908
+AMIRCHAND_20260324,Amir Chand Jagdish Kumar (Exports) Limited,2026-04-02,212.0,200.0,3.228758965092802,Amir Chand Jagdish Kumar (Exports),2026-04-02,212.0,195.0,1.44,ipo_listing_gains_2026.md,True,True,-2.500000000000002
+KISSHT_20260430,Onemi Technology Solutions Limited,2026-05-08,171.0,190.0,9.498234531496584,Onemi Technology Solutions,2026-05-08,171.0,191.0,0.59,ipo_listing_gains_2026.md,True,True,0.5263157894736858
+LCL_20260723,Lohia Corp Limited,2026-07-30,425.0,461.0,7.252382444761018,Lohia Corp,2026-07-30,425.0,461.0,7.26,ipo_listing_gains_2026.md,True,True,0.0
+HORIZONIND_20260817,Horizon Industrial Parks Limited,2026-08-24,60.0,60.25,1.4473400470892563,Horizon Industrial Parks,2026-08-24,60.0,60.25,1.52,ipo_listing_gains_2026.md,True,True,0.0
+LCCPROJECT_20260909,LCC Projects Limited,2026-09-17,146.0,189.0,48.51239977137976,LCC Projects,2026-09-17,146.0,189.0,49.57,ipo_listing_gains_2026.md,True,True,0.0
+SRIT_20260928,Srit India Limited,2026-10-06,130.0,148.0,125.16035756802721,SRIT,2026-10-06,130.0,148.0,125.16,ipo_listing_gains_2026.md,True,True,0.0

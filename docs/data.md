@@ -94,3 +94,81 @@ DuckDB view `etf_proxy_1d`. The loader reads it for instrument ETF, under the sa
 holdout lock as the equity data. It is a proxy, not ETF prices: no tracking error, no
 premium or discount to NAV, no spread beyond the slippage tier, no volume, and most
 sector ETFs listed only in 2020 or later.
+
+## Mainboard IPO dataset (phase 2, IPO track step 1)
+
+One row per mainboard IPO whose bidding ran on NSE, bid opening 2016-01-01 onward. Data
+only: no strategy reads it yet. Report: `research/ipo_dataset.md`. Download, then build
+(the build needs xpdf `pdftotext` 4.x on PATH, which Git for Windows ships; poppler's has
+no `-table` mode):
+
+    uv run python scripts/download_ipo.py            # NSE past-issue lists + per-issue JSON
+    uv run python scripts/download_bhavcopy.py       # every NSE bhavcopy since 2016-01-01
+    uv run python scripts/download_ipo_boa.py        # basis-of-allotment adverts (needs both above)
+    uv run python scripts/build_ipo.py               # -> data/clean/ipo/
+    uv run python scripts/report_ipo.py              # -> research/ipo_dataset_tables.md
+    uv run python scripts/check_ipo_tapetide.py      # aggregator cross-checks -> research/ipo_*_tapetide.csv
+
+`scripts/build_data.py` deletes all of `data/clean`, so rerun `build_ipo.py` after it.
+`data/clean/ipo/_cache/` holds advert text and the bhavcopy first-seen table, keyed by
+their input files; delete it to force a full rebuild (about 10 minutes).
+
+| Raw (`data/raw/ipo/`) | Source (all PRIMARY except the last) |
+|---|---|
+| `nse_past_issues/eq_<year>.json`, `all_<year>.json` | NSE `/api/public-past-issues`, `security_type=Equity` and `all`: symbol, company, bid dates, price band, issue price, listing date |
+| `nse_ipo_detail/<SYMBOL>.json` | NSE `/api/ipo-detail`: issue information (bid period, lot, registrar), consolidated category-wise bids at close, ISIN and listing date |
+| `bhavcopy/*.csv.zip` | NSE end-of-day bhavcopies, old format to 2024-07-05, UDiFF after; `bhavcopy_misses.json` lists weekdays with no file |
+| `nse_boa/ADV_<ISIN>_<DDMONYYYY>.pdf`, `probe_log.json` | NSE copies of the basis-of-allotment advert (a few are zips of newspaper pages under the .pdf name); the log has every date tried per issue |
+| `aggregator_tapetide/ipo_listing_gains_<year>.md` | Tapetide yearly pages (UNVERIFIED), used only by the cross-checks |
+
+Hand-made decisions, each with a reason and a source: `config/ipo_dataset.yaml` (one
+entry: CAMS 2020, listed on BSE only).
+
+`data/clean/ipo/ipos.parquet` (and `.csv`), columns `nsealgo.data.ipo_build.CLEAN_COLS`:
+
+- **Universe** (`nsealgo.data.ipo`). Rows of NSE's Equity list, minus those it marks as
+  FPOs, NCDs (NSE page code contains `ncd`), partly-paid lines or a "special withdrawal"
+  window (`list_row_kind`). Plus rows only the unfiltered list has: NSE overwrites an
+  issue's row with the company's later listed security, which drops the IPO from the
+  Equity filter (`overwritten_ipo_rows`; 17 issues, e.g. NTPC Green 2024). REIT and InvIT
+  units are left out.
+- **Identity and status.** `issue_id` = list symbol + bid open date. `status`: `listed`,
+  `withdrawn` (NSE's list says so), `pending` (closed within 30 days of the last bhavcopy),
+  `already_listed` (traded before bidding: an unlabelled follow-on offer),
+  `not_listed_on_nse_at_ipo` (config exception), or `not_found_on_nse` (no new ISIN within
+  45 days of the close).
+- **Issue terms.** `issue_open`, `issue_close`, `price_band_low/high` from the list.
+  `issue_price` is the list's price when the listing-day bhavcopy base price agrees, else
+  whichever of the two lies in the band, the list's first (`issue_price_src`). `lot_size`
+  from the per-issue JSON, else the advert's 1-lot category (`lot_size_src`).
+  `lot_value_at_cap` = lot x upper band. `retail_discount` (Rs per share) from the advert.
+- **Subscription.** `retail_sub_exch`: consolidated retail bids / retail shares at the
+  close of bidding (NSE JSON, before rejections). `retail_sub_boa`: the advert's "subscribed
+  to the extent of" figure (after rejections). `retail_sub` is the advert's figure where
+  there is one, else the exchange figure (`retail_sub_src`).
+- **Retail basis of allotment** (advert, `nsealgo.data.ipo_boa`): `retail_valid_applications`
+  (TOTAL row), `retail_allottees` and `retail_shares_allotted` ("... Equity Shares to N
+  successful ..."), `retail_lots_allotted` = shares / lot, `min_bid_applications` and
+  `min_bid_ratio` (the 1-lot row: the row with NSE's lot as its category and the most
+  applications). `p_1lot` (`p_1lot_method`): that row's ratio when it allots one lot; else
+  allottees / applications; else 100% when the advert's retail multiple is below 1. A
+  candidate outside [0.9/x, 6/x] (capped at 1; x = retail multiple) is dropped. A 1-lot row
+  holding under 10% of the shares applied for is dropped with its TOTAL, and an allottee
+  figure the applications or shares cannot support is dropped. `allotment_date`
+  (`allotment_date_src`): the date the basis was finalised with the designated exchange
+  (`designated_exchange`), else the date the board took it on record and allotted.
+- **Listing day** (bhavcopy, first session the ISIN appears): `listing_date`, `list_open`
+  (on an IPO's listing day the open is the price discovered in the pre-open call auction;
+  rule as reproduced from SEBI circular CIR/MRD/DP/01/2012, not read in the original),
+  `list_high/low/close`, `base_price`, `listing_match` (rule used, `nsealgo.data.ipo_listing`).
+  `ret_open` and `ret_close` are over `issue_price`, gross.
+- **Checks.** `checks` lists failed cross-checks: lot (JSON vs advert), list price vs base
+  price, advert offer price vs issue price (gross or net of the discount), allotment date
+  between close and listing, OHLC order, advert unreadable (scan or no character map) or
+  without a retail section, 1-lot row missing or too small, allottees implausible, 1-lot
+  chance outside the subscription bound, 1-lot ratio vs allottees/applications (2%
+  relative). A failing value is left empty or kept as built and flagged, never corrected
+  by hand. Readers: `nsealgo.data.ipo_read`; assembly and checks: `nsealgo.data.ipo_build`.
+
+No field comes from an aggregator. NSE's advert archive starts in Sep/Oct 2018: issues
+before that have no retail basis-of-allotment fields and no allotment date.

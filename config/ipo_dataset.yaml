@@ -1,0 +1,16 @@
+# Hand-made decisions for the mainboard IPO dataset (scripts/build_ipo.py), one entry per
+# issue, keyed by status. Every entry needs issue_id, reason and source. Rules belong in
+# src/nsealgo/data/ipo*.py; this file is only for cases no rule separates.
+
+# The IPO listed on another exchange only; the first NSE session is a later listing,
+# priced off that market, so it is not the IPO's listing day.
+not_listed_on_nse_at_ipo:
+  - issue_id: CAMS_20200921
+    reason: >-
+      Listed on BSE only on 2020-10-01 (NSE Investments was the selling shareholder). The
+      first NSE bhavcopy row, 2020-10-05, has base price 1401.60 against an issue price of
+      1230.
+    source: >-
+      UNVERIFIED news: https://www.business-standard.com/amp/article/companies/cams-ipo-upsized-by-50-to-facilitate-nse-exit-to-comprise-18-2-mn-shares-120091501350_1.html,
+      https://www.freepressjournal.in/business/after-months-of-getting-listed-cams-shares-debut-in-nse-now-find-out-why-it-took-so-long-to-get-listed-in-nse;
+      PRIMARY data: NSE bhavcopy 2020-10-05 (CAMS, INE596I01012)
