@@ -1,0 +1,40 @@
+# IPO v1: one lot of every affordable mainboard IPO, sold at the listing-day open.
+# Manual UPI applications, simulated only (hard rule 1). Pre-registered in
+# research/ipo_strategy_plan.md. Every parameter lives here; changing one is a new strategy
+# version (VERSION in src/nsealgo/strategies/ipo_v1.py). Costs: config/costs.yaml (ipo).
+
+capital_rupees: 20000
+bid_close_from: 2019-01-01
+bid_close_to: 2026-10-31
+lots_per_application: 1
+choice_statuses: [listed, withdrawn]   # withdrawn: blocked through the bid window, zero return
+
+# Blocking (NSE trading days; owner's decision 3, research/ipo_dataset.md section 7). Money is
+# blocked through the release day and free again from the next trading day.
+release:
+  not_allotted_days_after_allotment: 1
+  allotted_days_after_listing: 2
+  allotment_estimate_days_before_listing: 1   # when the advert gives no allotment date
+
+monte_carlo:
+  runs: 10000
+  seed: 20261101
+
+tax_sensitivity:          # base tier only; the owner's own tax is nil
+  stcg_pct: 20
+  due_month: 7            # paid on the first trading day on or after 31 July after the FY
+  due_day: 31
+
+benchmark:
+  tri_csv: data/raw/ipo/benchmark/nifty50_tri.csv
+  expense_ratio_pct: 0.05
+  base_date: 2018-12-31   # bought at this close, the last session before the period
+
+# Why named issues are not choices (report only; the rule is choice_statuses plus data gaps).
+notes:
+  CAMS_20200921: BSE-only listing (config/ipo_dataset.yaml)
+  PROTEAN_20231106: BSE-only listing (UNVERIFIED; research/ipo_dataset.md section 2)
+  NSDL_20250730: BSE-only listing (UNVERIFIED; research/ipo_dataset.md section 2)
+  NSE_20260917: BSE-only listing (the issuer itself; research/ipo_dataset.md section 2)
+  KPRAGRO_20190628: withdrawn a day before bidding opened (news, UNVERIFIED)
+  RUCHISOYA_20220324: traded before bidding (an unlabelled FPO)

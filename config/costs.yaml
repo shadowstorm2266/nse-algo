@@ -71,3 +71,24 @@ etf_slippage_bps_per_side:
   base: 10
   stress1: 20
   stress2: 30
+
+# IPO applications (manual UPI, simulated in research only; research/ipo_strategy_plan.md
+# section 6). The listing-day sale is an ordinary delivery sell (the delivery rates above,
+# the active preset's delivery brokerage and DP charge).
+ipo:
+  # Allotment: no brokerage and no STT. Stamp duty on an issue of securities is collected
+  # from the issuer (from the offeror for an offer for sale): Indian Stamp (Collection of
+  # Stamp-Duty through Stock Exchanges, Clearing Corporations and Depositories) Rules,
+  # 2019, rule 6(1) and 6(4), G.S.R. 901(E) of 10 Dec 2019 (Gazette of India). Taken as in
+  # force for allotments from stamp_rule_from (the deferral to 1 Jul 2020 is from secondary
+  # sources); before that, the owner's default rate on the allotment value.
+  stamp_rule_from: 2020-07-01
+  allotment_stamp_pct: 0
+  allotment_stamp_pct_before_rule: 0.015
+# Slippage on the listing-day open sale, percent of the price (owner's tiers). `none` is
+# the reference tier.
+ipo_listing_slippage_pct:
+  none: 0
+  base: 0.25
+  stress1: 0.5
+  stress2: 1.0

@@ -2,6 +2,9 @@
 equity-ETF units on delivery (instrument "ETF": own STT and stamp rates, everything
 else as equity delivery). Equity ("EQ") is the default instrument.
 
+IPO allotments (research only) have their own stamp rule (`IpoCosts`); their listing-day
+sale is an ordinary CNC sell.
+
 Pure functions on Decimal rupees. Each component is computed exactly and then
 rounded to the paisa (half-up); `total` is the sum of the rounded components.
 Slippage is not a charge here: it is applied to fill prices by the simulator, from
@@ -9,6 +12,7 @@ the instrument's tier table (`CostConfig.slippage_table`).
 """
 
 from dataclasses import dataclass
+from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
 from typing import Any, Literal
@@ -289,4 +293,35 @@ def load_cost_config(path: Path) -> CostConfig:
         active_brokerage=active,
         slippage_bps_per_side={k: _dec(v) for k, v in raw["slippage_bps_per_side"].items()},
         etf_slippage_bps_per_side={k: _dec(v) for k, v in raw["etf_slippage_bps_per_side"].items()},
+    )
+
+
+@dataclass(frozen=True)
+class IpoCosts:
+    """IPO allotment charges and listing-sale slippage tiers (config/costs.yaml `ipo`,
+    `ipo_listing_slippage_pct`). Every `*_pct` field is in percent."""
+
+    stamp_rule_from: date
+    allotment_stamp_pct: Decimal
+    allotment_stamp_pct_before_rule: Decimal
+    listing_slippage_pct: dict[str, Decimal]
+
+    def allotment_charges(self, value: Number, allotment_date: date) -> Decimal:
+        """Charges on an allotment of `value` rupees: stamp duty only (no brokerage, no
+        STT), at the rate in force on `allotment_date`."""
+        before = allotment_date < self.stamp_rule_from
+        pct = self.allotment_stamp_pct_before_rule if before else self.allotment_stamp_pct
+        return _paisa(_pct(_dec(value), pct))
+
+
+def load_ipo_costs(path: Path) -> IpoCosts:
+    """Parse the IPO entries of config/costs.yaml. Missing keys raise KeyError."""
+    with path.open(encoding="utf-8") as fh:
+        raw = yaml.safe_load(fh)
+    ipo = raw["ipo"]
+    return IpoCosts(
+        stamp_rule_from=ipo["stamp_rule_from"],
+        allotment_stamp_pct=_dec(ipo["allotment_stamp_pct"]),
+        allotment_stamp_pct_before_rule=_dec(ipo["allotment_stamp_pct_before_rule"]),
+        listing_slippage_pct={k: _dec(v) for k, v in raw["ipo_listing_slippage_pct"].items()},
     )

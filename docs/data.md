@@ -120,6 +120,7 @@ their input files; delete it to force a full rebuild (about 10 minutes).
 | `bhavcopy/*.csv.zip` | NSE end-of-day bhavcopies, old format to 2024-07-05, UDiFF after; `bhavcopy_misses.json` lists weekdays with no file |
 | `nse_boa/ADV_<ISIN>_<DDMONYYYY>.pdf`, `probe_log.json` | NSE copies of the basis-of-allotment advert (a few are zips of newspaper pages under the .pdf name); the log has every date tried per issue |
 | `aggregator_tapetide/ipo_listing_gains_<year>.md` | Tapetide yearly pages (UNVERIFIED), used only by the cross-checks |
+| `benchmark/nifty50_tri.csv` (+ price, manifest) | niftyindices.com Nifty 50 TRI for the IPO v1 benchmark: `scripts/download_indices.py --only nifty50 --out data/raw/ipo/benchmark` |
 
 Hand-made decisions, each with a reason and a source: `config/ipo_dataset.yaml` (one
 entry: CAMS 2020, listed on BSE only).
