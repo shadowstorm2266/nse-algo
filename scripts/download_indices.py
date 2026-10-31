@@ -1,6 +1,7 @@
 """Download daily history of the Nifty 50 and NSE sectoral indices into data/raw/indices/.
 
     uv run python scripts/download_indices.py
+    uv run python scripts/download_indices.py --only nifty50 --out data/raw/ipo/benchmark
 
 Source: niftyindices.com (NSE Indices Ltd, the index provider), the endpoints behind its
 "Historical Data" page. For each index in INDICES:
@@ -14,9 +15,11 @@ Values are kept as the text the source returns; only the date is rewritten as IS
 site serves at most one year per request, so each index is fetched by calendar year, and
 every row must name the requested index. Also writes nse_etf_list.csv (NSE's
 eq_etfseclist.csv, byte for byte) and manifest.json. Files in data/raw/indices/ are
-overwritten; nothing else is touched.
+overwritten; nothing else is touched. With --only, just the named indices are fetched,
+into --out (default data/raw/indices/), without the ETF list.
 """
 
+import argparse
 import csv
 import json
 import time
@@ -128,13 +131,19 @@ def _write_csv(path: Path, rows: list[dict], fields: list[str]) -> None:
 
 
 def main() -> None:
-    OUT.mkdir(parents=True, exist_ok=True)
+    ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    ap.add_argument("--only", nargs="+", choices=sorted(INDICES), help="fetch just these")
+    ap.add_argument("--out", type=Path, default=OUT, help="output directory")
+    args = ap.parse_args()
+    out = args.out if args.out.is_absolute() else REPO_ROOT / args.out
+    out.mkdir(parents=True, exist_ok=True)
     manifest: dict = {"downloaded_at": datetime.now(UTC).isoformat(), "indices": {}}
-    for key, names in INDICES.items():
+    for key in args.only or list(INDICES):
+        names = INDICES[key]
         price = _rows(PRICE_EP, names, PRICE_FIELDS)
         tri = _rows(TRI_EP, names, TRI_FIELDS)
-        _write_csv(OUT / f"{key}_price.csv", price, ["date", *PRICE_FIELDS])
-        _write_csv(OUT / f"{key}_tri.csv", tri, ["date", *TRI_FIELDS])
+        _write_csv(out / f"{key}_price.csv", price, ["date", *PRICE_FIELDS])
+        _write_csv(out / f"{key}_tri.csv", tri, ["date", *TRI_FIELDS])
         manifest["indices"][key] = {
             "trading_name": names[0],
             "long_name": names[1],
@@ -142,9 +151,10 @@ def main() -> None:
             "tri": {"endpoint": SITE + TRI_EP, "rows": len(tri)},
         }
         print(f"{key}: {len(price)} price rows, {len(tri)} TRI rows")
-    (OUT / "nse_etf_list.csv").write_bytes(_fetch(ETF_LIST_URL))
-    manifest["etf_list"] = ETF_LIST_URL
-    (OUT / "manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+    if not args.only:
+        (out / "nse_etf_list.csv").write_bytes(_fetch(ETF_LIST_URL))
+        manifest["etf_list"] = ETF_LIST_URL
+    (out / "manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
 
 
 if __name__ == "__main__":
