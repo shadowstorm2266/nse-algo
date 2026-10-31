@@ -277,3 +277,24 @@ looks cut).
    bids?
 
 Status: data only. Nothing was pre-registered; no strategy, backtest or trial was run.
+
+## 7. Owner's decisions (2026-10-31, after reading this report)
+
+1. **2016 to Sep 2018.** The 84 issues without allotment data stay as gaps. Chittorgarh is
+   not used (its robots file is respected). The IPO backtest starts in 2019.
+2. **Unreadable adverts** stay flagged. In the backtest, an issue with no parsed 1-lot chance
+   gets p = min(1, k / retail_sub_exch), where k is the median average-lots-per-application
+   of the parsed issues in the same year, and is marked as estimated. Results are also
+   reported without these issues.
+3. **Blocking.** A non-allotted application blocks money from the day we apply until
+   1 working day after the allotment date. An allotted one blocks it until the
+   listing-day sale settles and the money is back in the bank: listing date + 2 working
+   days. Withdrawn issues count as choices (blocked through the bid window, zero return),
+   because nobody knew in advance they would be withdrawn. BSE-only listings (CAMS,
+   Protean, NSDL, NSE) are excluded for lack of BSE prices and are listed in the report.
+
+Open for step 2, not decided here: which calendar "working day" means (NSE trading days
+are the only calendar in the repo; bank holidays differ), and which inputs define k
+(the advert's TOTAL row is after rejections, `retail_sub_exch` is before).
+
+Step 1b (what the selection rule may see before the UPI cutoff): `research/ipo_data_check_1b.md`.
