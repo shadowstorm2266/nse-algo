@@ -166,3 +166,8 @@ with pullback trials 14-17 and sector_rotation trials 18-21.
   total return vs +222.6% for equal-weight buy-and-hold of the 11 series and +201.2%
   for PX_NIFTY50. Not in the tables above; details in `research/strategy4_result.md`,
   rule in `research/strategy4_plan.md` section 2.
+- IPO v1 (IPO track, simulated manual UPI applications to mainboard IPOs, trials 22-25):
+  "check 2 FAIL; IPO v1 parked per the pre-registered rule" (owner's decision,
+  2026-11-02). Base median total 321.5% vs 132.0% for the Nifty 50 TRI, but the
+  per-year medians are ahead in only 3 of 8 years. Not in the tables above; details in
+  `research/ipo_v1_result.md`, rule in `research/ipo_strategy_plan.md` section 2.

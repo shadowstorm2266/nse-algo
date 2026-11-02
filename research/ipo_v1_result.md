@@ -301,3 +301,5 @@ simulation).
 Status: check 1 PASS, check 2 FAIL, check 3 REPORTED. The plan's decision rule says a
 FAIL on any first-pass check parks the IPO strategy. The owner has not yet recorded a
 decision.
+
+Status: check 2 FAIL; IPO v1 parked per the pre-registered rule.
