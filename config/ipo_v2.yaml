@@ -1,0 +1,32 @@
+# IPO v2 forward test, pre-registered in research/ipo_v2_plan.md. Fixed: changing any value
+# here is v3 and restarts the count. Manual UPI applications only (hard rule 1); the
+# decisions are records, the evaluation is a simulation (scripts/evaluate_ipo_v2.py).
+
+# The commit that added the plan (pushed to origin before any decision). An issue is in the
+# universe if its decision snapshot was fetched after this time.
+plan_commit: 31e5750d624777f56de15017d790ddc1285b098f
+plan_committed_at: '2026-11-02T13:16:28+05:30'
+
+threshold_total_x: 5.0      # apply if the consolidated Total row is >= this at the decision snapshot
+decision_slot: '15:30'      # the scheduled run whose snapshot decides, on the last bid day
+cutoff: '17:00'             # UPI mandate cutoff: only snapshots fetched before it count
+min_decisions: 20           # evaluation set: every decision up to the day of the 20th
+listing_wait_days: 45       # a decided issue neither listed nor withdrawn by then is reported
+
+# As IPO v1 (research/ipo_strategy_plan.md sections 5-7, config/strategies/ipo_v1.yaml).
+capital_rupees: 20000
+lots_per_application: 1
+release:
+  not_allotted_days_after_allotment: 1
+  allotted_days_after_listing: 2
+  allotment_estimate_days_before_listing: 1
+monte_carlo:
+  runs: 10000
+  seed: 20261101
+benchmark:
+  tri_csv: data/raw/ipo/benchmark/nifty50_tri.csv   # refresh with download_indices.py first
+  expense_ratio_pct: 0.05
+
+# Decided issues that NSE marks withdrawn, filled by hand when it happens:
+# - {issue_id: XYZ_20261201, source: "NSE past issues list, 2026-12-10"}
+withdrawn: []

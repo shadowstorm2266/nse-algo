@@ -28,10 +28,13 @@ ever overwritten. Machine paths come from config/ipo_live.yaml. Each run:
    - basis-of-allotment advert: probed like scripts/download_ipo_boa.py once the listing
      day is known, until found or 7 days after listing; parsed with nsealgo.data.ipo_boa
      using the configured pdftotext (checked every run; a parse failure is a warning).
-4. The scheduled run for the 19:30 slot commits and pushes data/live/ipo/ to its own git
+4. IPO v2 decisions (scripts/ipo_v2_decisions.py, research/ipo_v2_plan.md): for each issue
+   whose last bid day has come, the decision from the 15:30 snapshot is appended to
+   data/live/ipo/decisions.jsonl (fallback rules after 17:00).
+5. The scheduled run for the 19:30 slot commits and pushes data/live/ipo/ to its own git
    repository (scripts/ipo_live_backup.py). Git never touches the main repo, and the main
    repo is only read (code version: git rev-parse and status without optional locks).
-5. Appends one line to data/live/ipo/run_log.jsonl, also when the run fails; the 19:30
+6. Appends one line to data/live/ipo/run_log.jsonl, also when the run fails; the 19:30
    backup therefore holds that run's files and the log up to the previous run. Exit status
    1 if any step failed.
 """
@@ -53,14 +56,17 @@ from download_ipo_boa import _get as archive_get
 from ipo_live_backup import BackupError, LiveConfig, backup, load_live_config
 from ipo_live_backup import check as backup_check
 from ipo_live_steps import Net, Run, after_close, pdftotext_check, record_book, tracked
+from ipo_v2_decisions import load_v2_config, record_decisions
 
 from nsealgo.data.calendar import IST, load_holidays
 from nsealgo.data.ipo_live import open_mainboard, snapshot_name, write_new
 from nsealgo.data.live_schedule import LATE_WARN, check_schedule, is_trading_day, missed_in_window
 from nsealgo.settings import REPO_ROOT
+from nsealgo.strategies.ipo_v2 import IpoV2Config
 
 LIVE = REPO_ROOT / "data" / "live" / "ipo"
 HOLIDAYS = REPO_ROOT / "config" / "holidays.csv"
+IPO_V2 = REPO_ROOT / "config" / "ipo_v2.yaml"
 CURRENT_URL = SITE + "/api/ipo-current-issue"
 ARCHIVE_PAUSE_SECONDS = 0.4
 MAX_MISSED_SHOWN = 12
@@ -163,6 +169,7 @@ def run_once(
     clock: Callable[[], datetime],
     version: dict,
     cfg: LiveConfig | None = None,
+    v2: IpoV2Config | None = None,
 ) -> Run:
     run = Run(clock=clock, started_at=clock(), scheduled=scheduled, log=dict(version))
     if cfg is not None:
@@ -179,6 +186,8 @@ def run_once(
         else:
             today = run.started_at.date()
             bid_days(net, run, root, today)
+            if v2 is not None:
+                record_decisions(run, root, v2, read_log(root))
             for t in tracked(root):
                 after_close(net, run, root, t, today, holidays)
         if cfg is not None:
@@ -293,7 +302,8 @@ def main(argv: list[str]) -> int:
     keep_awake(True)
     try:
         now = lambda: datetime.now(IST)  # noqa: E731
-        run = run_once(net, LIVE, holidays, args.scheduled, now, code_version(), cfg)
+        v2 = load_v2_config(IPO_V2)
+        run = run_once(net, LIVE, holidays, args.scheduled, now, code_version(), cfg, v2)
     finally:
         keep_awake(False)
     print(
