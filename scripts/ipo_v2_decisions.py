@@ -21,7 +21,7 @@ import yaml
 from ipo_live_steps import Run, tracked
 
 from nsealgo.data.calendar import IST
-from nsealgo.data.ipo_live import Tracked, detail_matches, parse_snapshot_name
+from nsealgo.data.ipo_live import Tracked, decision_inputs, detail_matches, parse_snapshot_name
 from nsealgo.strategies.ipo_v2 import (
     IpoV2Config,
     choose_snapshot,
@@ -73,7 +73,8 @@ def _decide_one(
     if detail is not None and not detail_matches(detail, t.issue_open):
         run.warn(f"{t.issue_id}: decision snapshot {chosen[0]} is another bid period's")
         detail, chosen = None, None
-    return decision_record(t.issue_id, day, chosen, detail, cfg, run.clock())
+    book = decision_inputs(detail) if detail is not None else None
+    return decision_record(t.issue_id, day, chosen, book, cfg, run.clock())
 
 
 def record_decisions(run: Run, root: Path, cfg: IpoV2Config, log_rows: list[dict]) -> None:

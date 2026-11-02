@@ -10,6 +10,7 @@ from datetime import date, datetime, time
 import pytest
 
 from nsealgo.data.calendar import IST
+from nsealgo.data.ipo_live import decision_inputs
 from nsealgo.settings import REPO_ROOT
 from nsealgo.strategies.ipo_v2 import (
     IpoV2Config,
@@ -48,6 +49,10 @@ def with_total(x: str | None) -> dict:
     return d
 
 
+def total(x: str | None) -> float | None:
+    return decision_inputs(with_total(x))["total_x"]
+
+
 # --- pure rules ---------------------------------------------------------------------------
 
 
@@ -72,20 +77,23 @@ def test_the_scheduled_1530_snapshot_wins_if_fetched_before_the_cutoff(cfg):
 
 
 def test_apply_at_5x_or_more_on_the_consolidated_total():
-    assert decide(with_total("5.0"), 5.0) == ("apply", 5.0)
-    assert decide(with_total("4.999999"), 5.0) == ("skip", 4.999999)
-    assert decide(with_total("10.731376230779968"), 5.0)[0] == "apply"
-    assert decide(with_total(None), 5.0) == ("no_decision_data", None)
+    assert decide(total("5.0"), 5.0) == ("apply", 5.0)
+    assert decide(total("4.999999"), 5.0) == ("skip", 4.999999)
+    assert decide(total("10.731376230779968"), 5.0)[0] == "apply"
+    assert decide(total(None), 5.0) == ("no_decision_data", None)
 
 
 def test_decision_records_and_the_universe_cut(cfg):
     now = ist(2026, 11, 2, 15, 30, 9)
     chosen = ("20261102T153004+0530.json", "scheduled_1530", ist(2026, 11, 2, 15, 30, 4))
-    r = decision_record("BCSSL_20261029", D, chosen, with_total("10.73"), cfg, now)
+    r = decision_record("BCSSL_20261029", D, chosen, decision_inputs(with_total("10.73")), cfg, now)
     assert (r["status"], r["total_x"], r["lot"], r["band_high"]) == ("apply", 10.73, 182, 82.0)
     assert r["application_rs"] == 182 * 82.0 and r["plan_commit"] == cfg.plan_commit
     early = (chosen[0], chosen[1], ist(2026, 11, 2, 13, 0))  # fetched before the plan commit
-    assert decision_record("X", D, early, with_total("10"), cfg, now)["status"] == "before_plan"
+    assert (
+        decision_record("X", D, early, decision_inputs(with_total("10")), cfg, now)["status"]
+        == "before_plan"
+    )
     assert decision_record("X", D, None, None, cfg, now)["status"] == "no_decision_data"
     old = decision_record("X", date(2026, 10, 30), None, None, cfg, now)
     assert old["status"] == "before_plan"

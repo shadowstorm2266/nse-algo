@@ -281,3 +281,17 @@ def scan_issue_dir(path: Path) -> Tracked | None:
         listing=json.loads(listings[0].read_text("utf-8")) if listings else None,
         advert=adverts[0] if adverts else None,
     )
+
+
+def decision_inputs(detail: Mapping) -> dict:
+    """What the IPO v2 rule reads from a per-issue JSON (nsealgo.strategies.ipo_v2):
+    total (consolidated) and retail times, lot, top of the band and NSE's stamp. A missing
+    or unreadable field is None."""
+    s, band = book_summary(detail), price_band(detail)
+    return {
+        "total_x": s["total"][2] if s["total"] else None,
+        "retail_x": s["retail"][2] if s["retail"] else None,
+        "lot": s["lot"],
+        "band_high": band[1] if band else None,
+        "stamp": s["stamp"],
+    }

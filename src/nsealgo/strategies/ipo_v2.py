@@ -4,21 +4,21 @@ Pre-registered in research/ipo_v2_plan.md; parameters in config/ipo_v2.yaml.
 
 IPO applications are manual UPI and never automated (hard rule 1). This module only reads
 recorded snapshots and writes nothing: the decision rule (plan section 4), the evaluation
-set and the counts (section 6). No I/O; the callers pass parsed JSON and file names.
+set and the counts (section 6). No I/O and no parsing: the callers pass file names, fetch
+times and the book's fields (nsealgo.data.ipo_live.decision_inputs).
 """
 
 import math
 from collections.abc import Iterable, Mapping
 from datetime import date, datetime, time
 from typing import Literal
+from zoneinfo import ZoneInfo
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from nsealgo.data.calendar import IST
-from nsealgo.data.ipo import category_bids
-from nsealgo.data.ipo_live import book_summary, price_band
 from nsealgo.strategies.ipo_v1 import MonteCarlo, Release
 
+IST = ZoneInfo("Asia/Kolkata")
 NAME = "ipo"
 VERSION = "2"
 DECIDED = ("apply", "skip")
@@ -81,24 +81,24 @@ def choose_snapshot(
     return None
 
 
-def decide(detail: Mapping, threshold: float) -> tuple[str, float | None]:
+def decide(total_x: float | None, threshold: float) -> tuple[str, float | None]:
     """('apply' | 'skip', total times) from the consolidated book's Total row, or
-    ('no_decision_data', None) if that row is missing or unreadable."""
-    total = category_bids(detail, "Total")
-    if total is None or not math.isfinite(total[2]):
+    ('no_decision_data', None) if that row is missing or unreadable (None)."""
+    if total_x is None or not math.isfinite(total_x):
         return "no_decision_data", None
-    return ("apply" if total[2] >= threshold else "skip"), total[2]
+    return ("apply" if total_x >= threshold else "skip"), total_x
 
 
 def decision_record(
     issue_id: str,
     day: date,
     chosen: tuple[str, str, datetime] | None,
-    detail: Mapping | None,
+    book: Mapping | None,
     cfg: IpoV2Config,
     now: datetime,
 ) -> dict:
-    """The decisions.jsonl line for one issue (plan section 4)."""
+    """The decisions.jsonl line for one issue (plan section 4). `book` holds the decision
+    snapshot's fields (total_x, retail_x, lot, band_high, stamp)."""
     base = {
         "rule": f"{NAME} v{VERSION}",
         "plan_commit": cfg.plan_commit,
@@ -107,26 +107,25 @@ def decision_record(
         "decided_at": now.isoformat(),
         "threshold": cfg.threshold_total_x,
     }
-    if chosen is None or detail is None:
+    if chosen is None or book is None:
         before = cutoff_at(day, cfg) <= cfg.plan_committed_at
         return base | {"status": "before_plan" if before else "no_decision_data"}
     name, source, fetched = chosen
-    status, total = decide(detail, cfg.threshold_total_x)
+    status, total = decide(book.get("total_x"), cfg.threshold_total_x)
     if fetched <= cfg.plan_committed_at:
         status = "before_plan"
-    s, band = book_summary(detail), price_band(detail)
-    lot = s["lot"]
+    lot, high = book.get("lot"), book.get("band_high")
     return base | {
         "status": status,
         "snapshot": name,
         "snapshot_source": source,
         "snapshot_fetched_at": fetched.isoformat(),
-        "stamp": s["stamp"],
+        "stamp": book.get("stamp"),
         "total_x": total,
-        "retail_x": s["retail"][2] if s["retail"] else None,
+        "retail_x": book.get("retail_x"),
         "lot": lot,
-        "band_high": band[1] if band else None,
-        "application_rs": lot * band[1] if lot and band else None,
+        "band_high": high,
+        "application_rs": lot * high if lot and high else None,
     }
 
 
