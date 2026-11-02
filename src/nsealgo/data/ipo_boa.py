@@ -271,3 +271,11 @@ def boa_probe_dates(issue_close: date, listing_date: date) -> list[date]:
         if d > issue_close and d not in seen:
             seen.append(d)
     return seen
+
+
+_ADV_MONTHS = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"]
+
+
+def advert_name(isin: str, day: date) -> str:
+    """NSE's file name for an advert filed on `day`: 'ADV_INE0ABC01011_05NOV2026.pdf'."""
+    return f"ADV_{isin}_{day.day:02d}{_ADV_MONTHS[day.month - 1]}{day.year}.pdf"

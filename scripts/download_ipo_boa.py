@@ -16,7 +16,7 @@ import time
 import urllib.request
 from urllib.error import HTTPError
 
-from nsealgo.data.ipo_boa import boa_probe_dates
+from nsealgo.data.ipo_boa import advert_name, boa_probe_dates
 from nsealgo.data.ipo_read import BOA_DIR, read_issues, read_listings
 from nsealgo.settings import REPO_ROOT
 
@@ -26,7 +26,6 @@ UA = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/130.0 Safari/537.36"
 )
-MONTHS = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"]
 PAUSE_SECONDS = 0.4
 
 
@@ -68,7 +67,7 @@ def main() -> None:
             continue  # probed already under this ISIN
         entry: dict = {"isin": r["isin"], "found": None, "tried": []}
         for day in boa_probe_dates(r["issue_close"], r["listing_date"]):
-            name = f"ADV_{r['isin']}_{day.day:02d}{MONTHS[day.month - 1]}{day.year}.pdf"
+            name = advert_name(r["isin"], day)
             entry["tried"].append(day.isoformat())
             body = _get(URL.format(name=name))
             time.sleep(PAUSE_SECONDS)

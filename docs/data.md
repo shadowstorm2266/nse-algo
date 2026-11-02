@@ -175,3 +175,45 @@ entry: CAMS 2020, listed on BSE only).
 
 No field comes from an aggregator. NSE's advert archive starts in Sep/Oct 2018: issues
 before that have no retail basis-of-allotment fields and no allotment date.
+
+## Live IPO recorder (IPO track step 3, data only)
+
+Records what NSE shows for every mainboard IPO open for bidding from 2 Nov 2026 on. No
+strategy reads it, nothing is simulated and no trial is logged. Code:
+`scripts/record_ipo_live.py` (runs, schedule check, log), `scripts/ipo_live_steps.py`
+(per-issue steps), `nsealgo.data.ipo_live` (parsing, file names) and
+`nsealgo.data.live_schedule` (slots, missed runs).
+
+    uv run python scripts/record_ipo_live.py              # one manual run
+    uv run python scripts/record_ipo_live.py --status     # issues on disk, last runs, missed slots
+    uv run python scripts/make_ipo_task_xml.py            # Task Scheduler definition (creates no task)
+
+Sources (all PRIMARY, www.nseindia.com and nsearchives.nseindia.com):
+`/api/ipo-current-issue` (the IPO page's "Current Issues" table; found in the page's own
+script `dist/js/sections/live-market/upcoming-ipo.js`), `/api/ipo-detail` (per-issue JSON
+with the consolidated category-wise book and its "Updated as on" stamp), the daily
+bhavcopy, and the basis-of-allotment advert. Mainboard = series `EQ`, not an FPO or
+partly-paid line; SME and other rows are listed in the run log with the reason.
+
+Layout under `data/live/ipo/` (gitignored, local only). Files are created once and never
+rewritten:
+
+| Path | What |
+|---|---|
+| `current_issue/<stamp>.json` | each run's `/api/ipo-current-issue` body |
+| `<issue_id>/<stamp>.json` | per-issue JSON fetched on a bid day, close day included |
+| `<issue_id>/final_<stamp>.json` | per-issue JSON from the first run on a day after the close day |
+| `<issue_id>/listing_<YYYYMMDD>.json` | the issue's row in the listing day's bhavcopy: open, high, low, close, base price, match method, bhavcopy SHA-256 |
+| `<issue_id>/ADV_<ISIN>_<DDMONYYYY>.pdf` | basis-of-allotment advert, NSE's file name |
+| `bhavcopy/*.csv.zip`, `bhavcopy/misses.jsonl` | bhavcopies read to find the listing day; days with no file |
+| `run_log.jsonl` | one line per run: slot, lateness, missed slots, actions, warnings, errors, git hash |
+
+`<stamp>` is the fetch time in IST, `YYYYMMDDTHHMMSS+0530`; `<issue_id>` is
+`<SYMBOL>_<YYYYMMDD of bid open>` as in the research dataset. The live bhavcopies are kept
+apart from `data/raw/ipo/bhavcopy/`, whose first-seen logic needs an unbroken run of days.
+
+Schedule: 12:00, 15:30 and 19:30 IST on NSE trading days (weekdays not in
+`config/holidays.csv`), from one Task Scheduler task with three weekly triggers, created
+from the XML because `schtasks` flags cannot set "wake the computer to run this task".
+Each run compares its start with the log: a slot no scheduled run covered is printed and
+logged as missed, and a run more than 30 minutes after its slot as late.
