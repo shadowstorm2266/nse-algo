@@ -216,4 +216,23 @@ Schedule: 12:00, 15:30 and 19:30 IST on NSE trading days (weekdays not in
 `config/holidays.csv`), from one Task Scheduler task with three weekly triggers, created
 from the XML because `schtasks` flags cannot set "wake the computer to run this task".
 Each run compares its start with the log: a slot no scheduled run covered is printed and
-logged as missed, and a run more than 30 minutes after its slot as late.
+logged as missed, and a run more than 30 minutes after its slot as late. The task runs
+`uv run --frozen` (never rewrites `uv.lock`), only while the owner is logged on (no stored
+password, no admin rights), and opens a console window while it runs.
+
+Machine paths are in `config/ipo_live.yaml`: pdftotext by full path (a task's PATH is not
+the shell's; checked and logged every run) and the backup git directory.
+
+Backup: the recordings cannot be downloaded again, so the scheduled run for the 19:30 slot
+commits and pushes `data/live/ipo/` to a private GitHub repo, nse-algo-live-data
+(`scripts/ipo_live_backup.py`). Its git directory is a bare repo outside the main repo,
+and every git call passes `--git-dir` and `--work-tree`, so git never touches the main
+repo. A commit is refused unless every change is a new file or an append to
+`run_log.jsonl` / `bhavcopy/misses.jsonl`. The 19:30 run's own log line goes into the next
+backup.
+
+    uv run python scripts/ipo_live_backup.py init|run|check
+    uv run python scripts/make_ipo_task_xml.py                      # then, as the owner:
+    schtasks /Create /TN "nse-algo-record-ipo-live" /XML "<repo>\data\live\ipo\record_ipo_live_task.xml"
+    uv run python scripts/make_ipo_task_xml.py --check-env REPORT.json --out CHECK.xml
+    # create CHECK.xml as a task, schtasks /Run it, read REPORT.json, delete the task

@@ -3,9 +3,12 @@
     uv run python scripts/record_ipo_live.py              # one manual run
     uv run python scripts/record_ipo_live.py --scheduled  # what Task Scheduler runs
     uv run python scripts/record_ipo_live.py --status     # what is on disk; fetches nothing
+    uv run python scripts/record_ipo_live.py --check-env OUT.json  # environment report only
 
-No strategy, no simulation, no trial. Writes only under data/live/ipo/; the layout and file
-names are in nsealgo.data.ipo_live, and no file is ever overwritten. Each run:
+No strategy, no simulation, no trial. It runs on the owner's Windows laptop from Task
+Scheduler (scripts/make_ipo_task_xml.py); it is not the trading bot. Writes only under
+data/live/ipo/; the layout and file names are in nsealgo.data.ipo_live, and no file is
+ever overwritten. Machine paths come from config/ipo_live.yaml. Each run:
 
 1. Schedule check (nsealgo.data.live_schedule; slots 12:00, 15:30, 19:30 IST on NSE trading
    days): a WARNING for each slot no scheduled run covered since the last one, and for a
@@ -24,14 +27,21 @@ names are in nsealgo.data.ipo_live, and no file is ever overwritten. Each run:
      day counts as no session; before that the search waits. Up to 45 days after the close;
    - basis-of-allotment advert: probed like scripts/download_ipo_boa.py once the listing
      day is known, until found or 7 days after listing; parsed with nsealgo.data.ipo_boa
-     when pdftotext is on PATH (a parse failure is only a warning).
-4. Appends one line to data/live/ipo/run_log.jsonl, also when the run fails. Exit status 1
-   if any step failed.
+     using the configured pdftotext (checked every run; a parse failure is a warning).
+4. The scheduled run for the 19:30 slot commits and pushes data/live/ipo/ to its own git
+   repository (scripts/ipo_live_backup.py). Git never touches the main repo, and the main
+   repo is only read (code version: git rev-parse and status without optional locks).
+5. Appends one line to data/live/ipo/run_log.jsonl, also when the run fails; the 19:30
+   backup therefore holds that run's files and the log up to the previous run. Exit status
+   1 if any step failed.
 """
 
 import argparse
 import json
+import os
+import shutil
 import socket
+import subprocess
 import sys
 import time
 from collections.abc import Callable
@@ -40,12 +50,13 @@ from pathlib import Path
 
 from download_ipo import IPO_PAGE, SITE, NseSession
 from download_ipo_boa import _get as archive_get
-from ipo_live_steps import Net, Run, after_close, record_book, tracked
+from ipo_live_backup import BackupError, LiveConfig, backup, load_live_config
+from ipo_live_backup import check as backup_check
+from ipo_live_steps import Net, Run, after_close, pdftotext_check, record_book, tracked
 
 from nsealgo.data.calendar import IST, load_holidays
 from nsealgo.data.ipo_live import open_mainboard, snapshot_name, write_new
 from nsealgo.data.live_schedule import LATE_WARN, check_schedule, is_trading_day, missed_in_window
-from nsealgo.reporting.trials import git_state
 from nsealgo.settings import REPO_ROOT
 
 LIVE = REPO_ROOT / "data" / "live" / "ipo"
@@ -129,15 +140,36 @@ def append_log(root: Path, run: Run) -> None:
         fh.write(json.dumps(line, default=str) + "\n")
 
 
+def maybe_backup(run: Run, cfg: LiveConfig) -> None:
+    """Back up after the scheduled run for the backup slot (19:30)."""
+    slot = run.log.get("slot")
+    if not (run.scheduled and slot and datetime.fromisoformat(slot).time() == cfg.backup_after):
+        return
+    try:
+        result = backup(cfg.backup, f"data after the {slot} run")
+    except (BackupError, OSError) as err:
+        run.fail(f"backup: {err}")
+        return
+    run.log["backup"] = result
+    if not result["pushed"]:
+        run.warn(f"backup: {result['note']}")
+
+
 def run_once(
     net: Net,
     root: Path,
     holidays: set[date],
     scheduled: bool,
     clock: Callable[[], datetime],
-    git: dict,
+    version: dict,
+    cfg: LiveConfig | None = None,
 ) -> Run:
-    run = Run(clock=clock, started_at=clock(), scheduled=scheduled, log=dict(git))
+    run = Run(clock=clock, started_at=clock(), scheduled=scheduled, log=dict(version))
+    if cfg is not None:
+        run.pdftotext = cfg.pdftotext
+        run.log["pdftotext"] = pdftotext_check(cfg.pdftotext)
+        if not run.log["pdftotext"]["ok"]:
+            run.warn(f"pdftotext not usable: {run.log['pdftotext']}")
     try:
         if not schedule_step(run, root, holidays):
             run.log["skipped"] = "not an NSE trading day (config/holidays.csv)"
@@ -149,6 +181,8 @@ def run_once(
             bid_days(net, run, root, today)
             for t in tracked(root):
                 after_close(net, run, root, t, today, holidays)
+        if cfg is not None:
+            maybe_backup(run, cfg)
     except Exception as err:
         run.fail(f"run: {err!r}")
     finally:
@@ -202,6 +236,40 @@ def keep_awake(on: bool) -> None:
         ctypes.windll.kernel32.SetThreadExecutionState(flags)
 
 
+def code_version() -> dict:
+    """Main repo HEAD and whether it has local changes, read without writing anything
+    (no optional locks, so git status does not refresh the index)."""
+
+    def git(*args: str) -> str:
+        cmd = ["git", "--no-optional-locks", "-C", str(REPO_ROOT), *args]
+        return subprocess.run(cmd, capture_output=True, text=True, check=True).stdout.strip()
+
+    try:
+        return {
+            "git_hash": git("rev-parse", "HEAD"),
+            "git_dirty": bool(git("status", "--porcelain")),
+        }
+    except (OSError, subprocess.CalledProcessError):
+        return {"git_hash": "unknown", "git_dirty": None}
+
+
+def check_env(cfg: LiveConfig, out: Path) -> None:
+    """Write what this environment (e.g. a scheduled task's) sees; fetches no IPO data."""
+    report = {
+        "at": datetime.now(IST).isoformat(),
+        "user": f"{os.environ.get('USERDOMAIN')}\\{os.environ.get('USERNAME')}",
+        "cwd": os.getcwd(),
+        "python": sys.executable,
+        "pdftotext_on_path": shutil.which("pdftotext"),
+        "pdftotext": pdftotext_check(cfg.pdftotext),
+        "nse_reachable": wait_for_network(tries=1),
+        "backup": backup_check(cfg.backup),
+        "code": code_version(),
+    }
+    out.write_text(json.dumps(report, indent=1), encoding="utf-8")
+    print(json.dumps(report, indent=1))
+
+
 def archive(url: str) -> bytes | None:
     body = archive_get(url)
     time.sleep(ARCHIVE_PAUSE_SECONDS)
@@ -212,15 +280,20 @@ def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--scheduled", action="store_true", help="started by Task Scheduler")
     parser.add_argument("--status", action="store_true", help="report only; fetch nothing")
+    parser.add_argument("--check-env", type=Path, metavar="OUT", help="environment report only")
     args = parser.parse_args(argv)
-    holidays = load_holidays(HOLIDAYS)
+    holidays, cfg = load_holidays(HOLIDAYS), load_live_config()
     if args.status:
         print_status(LIVE, holidays, datetime.now(IST))
+        return 0
+    if args.check_env:
+        check_env(cfg, args.check_env)
         return 0
     net = Net(nse=NseSession().get, archive=archive, ready=wait_for_network)
     keep_awake(True)
     try:
-        run = run_once(net, LIVE, holidays, args.scheduled, lambda: datetime.now(IST), git_state())
+        now = lambda: datetime.now(IST)  # noqa: E731
+        run = run_once(net, LIVE, holidays, args.scheduled, now, code_version(), cfg)
     finally:
         keep_awake(False)
     print(

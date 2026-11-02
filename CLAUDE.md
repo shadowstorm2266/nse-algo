@@ -1,6 +1,7 @@
 # nse-algo
 
 Research, paper-trading and (later) live system for NSE equity cash strategies: intraday (MIS) and swing (delivery). Starting capital ₹20,000. The bot runs unattended on a Linux VM; the owner checks it between classes via Telegram.
+The live IPO data recorder (`scripts/record_ipo_live.py`) runs on the owner's Windows laptop via Task Scheduler; it is not the trading bot.
 
 IMPORTANT: This code will eventually place real orders with real money. Correctness beats speed. If something is ambiguous, stop and ask instead of guessing.
 

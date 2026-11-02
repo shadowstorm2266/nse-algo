@@ -91,25 +91,26 @@ def read_listings(
     return listings_frame(issues, new, sym_first), bhavcopy_day(paths[0]), bhavcopy_day(paths[-1])
 
 
-def _pdftotext(pdf: Path, table: bool) -> str:
+def _pdftotext(pdf: Path, table: bool, exe: str = "pdftotext") -> str:
     """pdftotext's text, or '' if it cannot read the file (one NSE advert is served cut
-    short: its GET body is 2.3 MB of a 4.4 MB PDF). '' then counts as unreadable."""
-    args = ["pdftotext", "-q", "-enc", "UTF-8", *(["-table"] if table else []), str(pdf), "-"]
+    short: its GET body is 2.3 MB of a 4.4 MB PDF). '' then counts as unreadable. `exe` is
+    the program, a full path where PATH cannot be relied on (scheduled tasks)."""
+    args = [exe, "-q", "-enc", "UTF-8", *(["-table"] if table else []), str(pdf), "-"]
     done = subprocess.run(args, capture_output=True, check=False)
     return done.stdout.decode("utf-8", errors="replace") if done.returncode == 0 else ""
 
 
-def pdf_text(path: Path, table: bool) -> str:
+def pdf_text(path: Path, table: bool, exe: str = "pdftotext") -> str:
     """xpdf pdftotext 4.x output (reading order, or `-table` layout) of an advert file:
     a PDF, or a zip of PDF newspaper pages (members read in name order, joined)."""
     if path.read_bytes()[:4] != ZIP_MAGIC:
-        return _pdftotext(path, table)
+        return _pdftotext(path, table, exe)
     parts = []
     with zipfile.ZipFile(path) as zf, tempfile.TemporaryDirectory() as tmp:
         for i, name in enumerate(sorted(n for n in zf.namelist() if n.lower().endswith(".pdf"))):
             member = Path(tmp) / f"page{i}.pdf"
             member.write_bytes(zf.read(name))
-            parts.append(_pdftotext(member, table))
+            parts.append(_pdftotext(member, table, exe))
     return "\n".join(parts)
 
 

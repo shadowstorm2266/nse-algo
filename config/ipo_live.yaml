@@ -1,0 +1,14 @@
+# Live IPO recorder (scripts/record_ipo_live.py). It runs on the owner's Windows laptop
+# from Task Scheduler; it is data collection only, not the trading bot. Machine paths.
+
+# xpdf pdftotext 4.x, by full path: a scheduled task's PATH is not the shell's.
+pdftotext: 'C:\Program Files\Git\mingw64\bin\pdftotext.exe'
+
+# Backup of data/live/ipo/ to its own git repository (scripts/ipo_live_backup.py). The git
+# directory is outside the main repo; git is always called with explicit --git-dir and
+# --work-tree, so it never touches the main repo.
+backup:
+  git_dir: 'C:\Users\Advik\nse-algo-live-data.git'
+  remote: origin
+  branch: main
+  after_slot: '19:30'  # the scheduled run for this slot commits and pushes

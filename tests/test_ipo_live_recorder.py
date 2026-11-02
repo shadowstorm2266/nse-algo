@@ -115,7 +115,7 @@ OTHER = ("OTHER", "EQ", "INE0OT001010", 10.0, 11.0, 10.0)
 
 @pytest.fixture
 def recorder(tmp_path, monkeypatch):
-    monkeypatch.setattr(ipo_live_steps, "pdf_text", lambda path, table: "")  # no pdftotext
+    monkeypatch.setattr(ipo_live_steps, "pdf_text", lambda path, table, exe: "")  # no pdftotext
     fake, root = FakeNet(), tmp_path / "live"
 
     def run(at: datetime, scheduled: bool = True, holidays: set[date] = HOLIDAYS_2026):
@@ -288,4 +288,10 @@ def test_the_task_definition_wakes_the_pc_three_times_a_weekday():
     settings = {e.tag.split("}")[1]: e.text for e in root.find("t:Settings", ns)}
     assert settings["WakeToRun"] == "true" and settings["StartWhenAvailable"] == "true"
     assert settings["DisallowStartIfOnBatteries"] == "false"
-    assert root.find(".//t:Arguments", ns).text.endswith("record_ipo_live.py --scheduled")
+    args = root.find(".//t:Arguments", ns).text
+    assert args == "run --frozen python scripts/record_ipo_live.py --scheduled"
+    check = make_ipo_task_xml.task_xml(
+        date(2026, 11, 2), "uv.exe", REPO_ROOT, r"PC\me", "run --frozen x --check-env r", False
+    )
+    check_root = ET.fromstring(check.encode("utf-16"))
+    assert check_root.findall(".//t:CalendarTrigger", ns) == []

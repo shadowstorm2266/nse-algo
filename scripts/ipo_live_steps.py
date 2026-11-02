@@ -6,6 +6,7 @@ which refuses to overwrite.
 
 import hashlib
 import json
+import subprocess
 import urllib.parse
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -56,6 +57,7 @@ class Run:
     actions: list[dict] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
+    pdftotext: str = "pdftotext"  # full path in production (config/ipo_live.yaml)
 
     def warn(self, msg: str) -> None:
         print(f"WARNING: {msg}", flush=True)
@@ -68,6 +70,17 @@ class Run:
     def did(self, action: dict) -> None:
         print(" ".join(f"{k}={v}" for k, v in action.items()), flush=True)
         self.actions.append(action)
+
+
+def pdftotext_check(exe: str) -> dict:
+    """Whether `exe` runs and is xpdf pdftotext 4.x (the advert parser needs `-table`)."""
+    try:
+        done = subprocess.run([exe, "-v"], capture_output=True, text=True, timeout=30)
+    except (OSError, subprocess.TimeoutExpired) as err:
+        return {"path": exe, "ok": False, "error": repr(err)}
+    lines = (done.stdout or done.stderr).splitlines()
+    version = lines[0] if lines else ""
+    return {"path": exe, "ok": version.startswith("pdftotext version 4."), "version": version}
 
 
 def tracked(root: Path) -> list[Tracked]:
@@ -167,10 +180,10 @@ def save_listing(run: Run, root: Path, t: Tracked, row: dict, bhav: Path) -> dic
 def advert_fields(run: Run, path: Path, lot: int | None) -> dict:
     """A few parsed fields for the run log; the advert file is the record."""
     try:
-        prose = pdf_text(path, table=False)
+        prose = pdf_text(path, table=False, exe=run.pdftotext)
         if not text_is_readable(prose):
             return {"readable": False}
-        boa = parse_retail_boa(prose, pdf_text(path, table=True), lot)
+        boa = parse_retail_boa(prose, pdf_text(path, table=True, exe=run.pdftotext), lot)
     except OSError as err:  # FileNotFoundError: pdftotext is not on PATH
         run.warn(f"{path.name} saved but not parsed: {err!r}")
         return {}
