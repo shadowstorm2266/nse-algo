@@ -32,7 +32,7 @@ from nsealgo.data.calendar import IST
 from nsealgo.data.live_schedule import SLOT_TIMES
 from nsealgo.settings import REPO_ROOT
 
-DEFAULT_OUT = REPO_ROOT / "data" / "live" / "ipo" / "record_ipo_live_task.xml"
+DEFAULT_OUT = REPO_ROOT / "data" / "live" / "record_ipo_live_task.xml"  # not backed up
 DAYS = "<Monday /><Tuesday /><Wednesday /><Thursday /><Friday />"
 SCHEDULED_ARGS = "run --frozen python scripts/record_ipo_live.py --scheduled"
 

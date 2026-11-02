@@ -233,6 +233,6 @@ backup.
 
     uv run python scripts/ipo_live_backup.py init|run|check
     uv run python scripts/make_ipo_task_xml.py                      # then, as the owner:
-    schtasks /Create /TN "nse-algo-record-ipo-live" /XML "<repo>\data\live\ipo\record_ipo_live_task.xml"
+    schtasks /Create /TN "nse-algo-record-ipo-live" /XML "<repo>\data\live\record_ipo_live_task.xml"
     uv run python scripts/make_ipo_task_xml.py --check-env REPORT.json --out CHECK.xml
     # create CHECK.xml as a task, schtasks /Run it, read REPORT.json, delete the task
