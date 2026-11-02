@@ -126,15 +126,19 @@ def backup(cfg: BackupConfig, message: str) -> dict:
 
 
 def check(cfg: BackupConfig) -> dict:
-    """Whether this environment can reach the remote (credentials included)."""
+    """Whether this environment can push to the remote, credentials included: a dry-run
+    push authenticates against the remote's push service without sending anything."""
     if not (cfg.git_dir / "HEAD").exists():
         return {"ok": False, "error": f"{cfg.git_dir} is not set up"}
     url = git(cfg, "remote", "get-url", cfg.remote, check=False)
     if url.returncode != 0:
         return {"ok": False, "error": f"no remote {cfg.remote!r}"}
-    done = git(cfg, "ls-remote", cfg.remote, check=False)
+    ref = f"HEAD:refs/heads/{cfg.branch}"
+    done = git(cfg, "push", "--dry-run", "--porcelain", cfg.remote, ref, check=False)
     err = done.stderr.decode("utf-8", "replace").strip()[-300:]
-    return {"ok": done.returncode == 0, "remote": url.stdout.decode().strip(), "error": err}
+    out = done.stdout.decode("utf-8", "replace").strip()[-300:]
+    remote = url.stdout.decode().strip()
+    return {"ok": done.returncode == 0, "remote": remote, "dry_run": out, "error": err}
 
 
 def main(argv: list[str]) -> int:

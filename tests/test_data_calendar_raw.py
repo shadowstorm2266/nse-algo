@@ -109,7 +109,11 @@ def test_repo_configs_load():
         date(2021, 2, 24): "nse_outage",
         date(2021, 2, 25): "prev_session_outage_close",
     }
-    assert load_holidays(REPO_ROOT / "config" / "holidays.csv") == set()
+    holidays = load_holidays(REPO_ROOT / "config" / "holidays.csv")
+    # 2026: NSE/CMTR/71775 (15 weekday holidays) + NSE/CMTR/72260 (January 15)
+    assert len({d for d in holidays if d.year == 2026}) == 16
+    assert date(2026, 1, 15) in holidays and date(2026, 11, 24) in holidays
+    assert all(d.weekday() < 5 for d in holidays)  # weekend holidays are not listed
 
 
 def test_day_after_early_close_outage_is_no_trade_but_full():
