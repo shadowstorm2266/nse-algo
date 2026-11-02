@@ -194,3 +194,9 @@ def test_a_snapshot_before_the_plan_commit_is_before_plan(day_runner):
     run(ist(2026, 11, 2, 19, 30, 2))
     (d,) = decisions(root)
     assert d["status"] == "before_plan" and d["snapshot"] == "20261102T120003+0530.json"
+
+
+def test_the_backup_accepts_appends_to_the_decisions_file():
+    import ipo_live_backup
+
+    assert ipo_v2_decisions.DECISIONS in ipo_live_backup.APPENDABLE

@@ -207,6 +207,7 @@ rewritten:
 | `<issue_id>/ADV_<ISIN>_<DDMONYYYY>.pdf` | basis-of-allotment advert, NSE's file name |
 | `bhavcopy/*.csv.zip`, `bhavcopy/misses.jsonl` | bhavcopies read to find the listing day; days with no file |
 | `run_log.jsonl` | one line per run: slot, lateness, missed slots, actions, warnings, errors, git hash |
+| `decisions.jsonl` | IPO v2 forward test: one apply/skip decision per issue from its 15:30 last-day snapshot (`research/ipo_v2_plan.md`, `scripts/ipo_v2_decisions.py`); append-only |
 
 `<stamp>` is the fetch time in IST, `YYYYMMDDTHHMMSS+0530`; `<issue_id>` is
 `<SYMBOL>_<YYYYMMDD of bid open>` as in the research dataset. The live bhavcopies are kept
