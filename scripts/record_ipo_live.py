@@ -35,7 +35,11 @@ ever overwritten. Machine paths come from config/ipo_live.yaml. Each run:
 5. The scheduled run for the 19:30 slot commits and pushes data/live/ipo/ to its own git
    repository (scripts/ipo_live_backup.py). Git never touches the main repo, and the main
    repo is only read (code version: git rev-parse and status without optional locks).
-6. Appends one line to data/live/ipo/run_log.jsonl, also when the run fails; the 19:30
+6. Telegram messages to the owner (scripts/ipo_live_notify.py): each v2 decision, an
+   alert on errors, newly missed slots or an unpushed backup, and a heartbeat after the
+   19:30 run. Nothing about listings, allotment or P&L (v2 is blind). Skipped when
+   TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID is not set; a failed send is a warning.
+7. Appends one line to data/live/ipo/run_log.jsonl, also when the run fails; the 19:30
    backup therefore holds that run's files and the log up to the previous run. Exit status
    1 if any step failed.
 """
@@ -56,12 +60,14 @@ from download_ipo import IPO_PAGE, SITE, NseSession
 from download_ipo_boa import _get as archive_get
 from ipo_live_backup import BackupError, LiveConfig, backup, load_live_config
 from ipo_live_backup import check as backup_check
+from ipo_live_notify import HEARTBEAT_SLOT, notify_run
 from ipo_live_steps import Net, Run, after_close, pdftotext_check, record_book, tracked
 from ipo_v2_decisions import load_v2_config, record_decisions
 
 from nsealgo.data.calendar import IST, load_holidays
 from nsealgo.data.ipo_live import open_mainboard, snapshot_name, write_new
 from nsealgo.data.live_schedule import LATE_WARN, check_schedule, is_trading_day, missed_in_window
+from nsealgo.notify import Notifier, notifier_from_settings
 from nsealgo.settings import REPO_ROOT
 from nsealgo.strategies.ipo_v2 import IpoV2Config
 
@@ -171,6 +177,7 @@ def run_once(
     version: dict,
     cfg: LiveConfig | None = None,
     v2: IpoV2Config | None = None,
+    notifier: Notifier | None = None,
 ) -> Run:
     run = Run(clock=clock, started_at=clock(), scheduled=scheduled, log=dict(version))
     if cfg is not None:
@@ -196,8 +203,18 @@ def run_once(
     except Exception as err:
         run.fail(f"run: {err!r}")
     finally:
-        append_log(root, run)
+        finish(run, root, notifier, cfg)
     return run
+
+
+def finish(run: Run, root: Path, notifier: Notifier | None, cfg: LiveConfig | None) -> None:
+    """Telegram messages (their failures are warnings), then the run_log line."""
+    try:
+        slot_time = cfg.backup_after if cfg is not None else HEARTBEAT_SLOT
+        notify_run(run, root, notifier, read_log(root), slot_time)
+    except Exception as err:
+        run.warn(f"telegram: {err!r}")
+    append_log(root, run)
 
 
 def backfill_once(
@@ -208,6 +225,7 @@ def backfill_once(
     clock: Callable[[], datetime],
     version: dict,
     cfg: LiveConfig | None = None,
+    notifier: Notifier | None = None,
 ) -> Run:
     """One issue's after-close steps (final book, listing day, advert), with the advert
     probed even after its 7-day window; for an issue the scheduled runs missed. Manual
@@ -229,7 +247,7 @@ def backfill_once(
     except Exception as err:
         run.fail(f"backfill: {err!r}")
     finally:
-        append_log(root, run)
+        finish(run, root, notifier, cfg)
     return run
 
 
@@ -319,6 +337,16 @@ def archive(url: str) -> bytes | None:
     return body
 
 
+def owner_notifier() -> Notifier | None:
+    """None if Telegram is not set up or the settings cannot be read. Only the error's
+    type is printed: a settings error can quote values from .env."""
+    try:
+        return notifier_from_settings()
+    except Exception as err:
+        print(f"WARNING: telegram not available: {type(err).__name__}")
+        return None
+
+
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--scheduled", action="store_true", help="started by Task Scheduler")
@@ -334,14 +362,16 @@ def main(argv: list[str]) -> int:
         check_env(cfg, args.check_env)
         return 0
     net = Net(nse=NseSession().get, archive=archive, ready=wait_for_network)
+    tg = owner_notifier()
     keep_awake(True)
     try:
         now = lambda: datetime.now(IST)  # noqa: E731
+        ver = code_version()
         if args.backfill:
-            run = backfill_once(net, LIVE, holidays, args.backfill, now, code_version(), cfg)
+            run = backfill_once(net, LIVE, holidays, args.backfill, now, ver, cfg, tg)
         else:
             v2 = load_v2_config(IPO_V2)
-            run = run_once(net, LIVE, holidays, args.scheduled, now, code_version(), cfg, v2)
+            run = run_once(net, LIVE, holidays, args.scheduled, now, ver, cfg, v2, tg)
     finally:
         keep_awake(False)
     print(

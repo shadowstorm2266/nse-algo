@@ -239,6 +239,20 @@ the same way, e.g. `<base python.exe> -s scripts/venv_run.py -m pytest -q`.
 after its 7-day window; it logs a run_log line with `"backfill"` and no slot, which the
 IPO v2 decision step ignores.
 
+Phone alerts (send-only Telegram bot, `scripts/ipo_live_notify.py`, `nsealgo.notify`): each
+IPO v2 decision as it is made (issue, apply/skip, total subscription at the snapshot,
+application amount); an alert when a run has errors, finds missed slots no earlier run
+reported, or the 19:30 backup did not push; and one heartbeat after the scheduled 19:30
+run (runs, decisions and launch failures today, issues open for bidding), also on a
+holiday. No heartbeat means the laptop was off or the launch failed. Nothing about
+listings, adverts, allotment, post-listing prices or P&L is sent while v2 is blind: error
+text is sent only for steps before the listing. A failed send is a run_log warning and
+never fails the run. The bot has no commands. `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`
+are read only through `nsealgo.settings`; without both, nothing is sent.
+
+    <base python.exe> -s scripts/venv_run.py scripts/telegram_setup.py         # your chat id
+    <base python.exe> -s scripts/venv_run.py scripts/telegram_setup.py --test  # test message
+
 Machine paths are in `config/ipo_live.yaml`: pdftotext by full path (a task's PATH is not
 the shell's; checked and logged every run) and the backup git directory.
 
