@@ -4,6 +4,7 @@
     uv run python scripts/record_ipo_live.py --scheduled  # what Task Scheduler runs
     uv run python scripts/record_ipo_live.py --status     # what is on disk; fetches nothing
     uv run python scripts/record_ipo_live.py --check-env OUT.json  # environment report only
+    uv run python scripts/record_ipo_live.py --backfill ISSUE_ID   # missed after-close steps
 
 No strategy, no simulation, no trial. It runs on the owner's Windows laptop from Task
 Scheduler (scripts/make_ipo_task_xml.py); it is not the trading bot. Writes only under
@@ -199,6 +200,39 @@ def run_once(
     return run
 
 
+def backfill_once(
+    net: Net,
+    root: Path,
+    holidays: set[date],
+    issue: str,
+    clock: Callable[[], datetime],
+    version: dict,
+    cfg: LiveConfig | None = None,
+) -> Run:
+    """One issue's after-close steps (final book, listing day, advert), with the advert
+    probed even after its 7-day window; for an issue the scheduled runs missed. Manual
+    only: no bid days, no decisions, no backup; logged with "backfill": issue."""
+    run = Run(clock=clock, started_at=clock(), scheduled=False, log=dict(version))
+    run.log["backfill"] = issue
+    if cfg is not None:
+        run.pdftotext = cfg.pdftotext
+        run.log["pdftotext"] = pdftotext_check(cfg.pdftotext)
+    try:
+        found = [t for t in tracked(root) if t.issue_id == issue]
+        if not found:
+            run.fail(f"backfill: no issue {issue!r} on disk")
+        elif not net.ready():
+            run.fail("network: www.nseindia.com unreachable")
+        else:
+            today = run.started_at.date()
+            after_close(net, run, root, found[0], today, holidays, advert_window=False)
+    except Exception as err:
+        run.fail(f"backfill: {err!r}")
+    finally:
+        append_log(root, run)
+    return run
+
+
 def print_status(root: Path, holidays: set[date], now: datetime) -> None:
     """Issues on disk, the last 10 runs, and slots missed in the last 14 days."""
     print("issue_id | bid period | snapshots | final | listing (open, close) | advert")
@@ -290,6 +324,7 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--scheduled", action="store_true", help="started by Task Scheduler")
     parser.add_argument("--status", action="store_true", help="report only; fetch nothing")
     parser.add_argument("--check-env", type=Path, metavar="OUT", help="environment report only")
+    parser.add_argument("--backfill", metavar="ISSUE_ID", help="one issue's after-close steps")
     args = parser.parse_args(argv)
     holidays, cfg = load_holidays(HOLIDAYS), load_live_config()
     if args.status:
@@ -302,8 +337,11 @@ def main(argv: list[str]) -> int:
     keep_awake(True)
     try:
         now = lambda: datetime.now(IST)  # noqa: E731
-        v2 = load_v2_config(IPO_V2)
-        run = run_once(net, LIVE, holidays, args.scheduled, now, code_version(), cfg, v2)
+        if args.backfill:
+            run = backfill_once(net, LIVE, holidays, args.backfill, now, code_version(), cfg)
+        else:
+            v2 = load_v2_config(IPO_V2)
+            run = run_once(net, LIVE, holidays, args.scheduled, now, code_version(), cfg, v2)
     finally:
         keep_awake(False)
     print(

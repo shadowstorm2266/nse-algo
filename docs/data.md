@@ -186,6 +186,7 @@ strategy reads it, nothing is simulated and no trial is logged. Code:
 
     uv run python scripts/record_ipo_live.py              # one manual run
     uv run python scripts/record_ipo_live.py --status     # issues on disk, last runs, missed slots
+    uv run python scripts/record_ipo_live.py --backfill ISSUE_ID  # missed after-close steps
     uv run python scripts/make_ipo_task_xml.py            # Task Scheduler definition (creates no task)
 
 Sources (all PRIMARY, www.nseindia.com and nsearchives.nseindia.com):
@@ -207,6 +208,7 @@ rewritten:
 | `<issue_id>/ADV_<ISIN>_<DDMONYYYY>.pdf` | basis-of-allotment advert, NSE's file name |
 | `bhavcopy/*.csv.zip`, `bhavcopy/misses.jsonl` | bhavcopies read to find the listing day; days with no file |
 | `run_log.jsonl` | one line per run: slot, lateness, missed slots, actions, warnings, errors, git hash |
+| `launch_failures.jsonl` | one line per task launch that exited non-zero or could not start: IST time, exit code, command, stderr (`scripts/run_ipo_task.ps1`); append-only |
 | `decisions.jsonl` | IPO v2 forward test: one apply/skip decision per issue from its 15:30 last-day snapshot (`research/ipo_v2_plan.md`, `scripts/ipo_v2_decisions.py`); append-only |
 
 `<stamp>` is the fetch time in IST, `YYYYMMDDTHHMMSS+0530`; `<issue_id>` is
@@ -218,8 +220,24 @@ Schedule: 12:00, 15:30 and 19:30 IST on NSE trading days (weekdays not in
 from the XML because `schtasks` flags cannot set "wake the computer to run this task".
 Each run compares its start with the log: a slot no scheduled run covered is printed and
 logged as missed, and a run more than 30 minutes after its slot as late. The task runs
-`uv run --frozen` (never rewrites `uv.lock`), only while the owner is logged on (no stored
-password, no admin rights), and opens a console window while it runs.
+only while the owner is logged on (no stored password, no admin rights), and opens a
+console window while it runs.
+
+Launch path (since 21 Nov 2026): Windows PowerShell runs `scripts/run_ipo_task.ps1`, which
+starts the venv's base interpreter (`home` in `.venv/pyvenv.cfg`) on
+`scripts/venv_run.py scripts/record_ipo_live.py --scheduled`. The wrapper keeps the last
+run's stdout and stderr in `data/live/last_launch_std{out,err}.txt`; if the launch exits
+non-zero or cannot start, it appends a line to `launch_failures.jsonl`, commits that file
+alone to the backup repo and pushes it (a failed launch cannot run the Python backup).
+Not `uv run`: from 5 Nov 2026 15:30 Windows Smart App Control (Code Integrity event 3077)
+blocked uv's unsigned venv launcher `.venv\Scripts\python.exe`, so `uv` exited 2 before
+the recorder started and nothing was logged until 21 Nov. The base interpreter is still
+allowed; no security setting was changed. While the block lasts, run the repo's commands
+the same way, e.g. `<base python.exe> -s scripts/venv_run.py -m pytest -q`.
+
+`--backfill ISSUE_ID` (manual) runs one issue's after-close steps, probing the advert even
+after its 7-day window; it logs a run_log line with `"backfill"` and no slot, which the
+IPO v2 decision step ignores.
 
 Machine paths are in `config/ipo_live.yaml`: pdftotext by full path (a task's PATH is not
 the shell's; checked and logged every run) and the backup git directory.
@@ -229,7 +247,7 @@ commits and pushes `data/live/ipo/` to a private GitHub repo, nse-algo-live-data
 (`scripts/ipo_live_backup.py`). Its git directory is a bare repo outside the main repo,
 and every git call passes `--git-dir` and `--work-tree`, so git never touches the main
 repo. A commit is refused unless every change is a new file or an append to
-`run_log.jsonl` / `bhavcopy/misses.jsonl`. The 19:30 run's own log line goes into the next
+`run_log.jsonl`, `bhavcopy/misses.jsonl`, `decisions.jsonl` or `launch_failures.jsonl`. The 19:30 run's own log line goes into the next
 backup.
 
     uv run python scripts/ipo_live_backup.py init|run|check

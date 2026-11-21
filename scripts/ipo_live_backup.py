@@ -29,7 +29,12 @@ from nsealgo.settings import REPO_ROOT
 
 CONFIG = REPO_ROOT / "config" / "ipo_live.yaml"
 WORK_TREE = REPO_ROOT / "data" / "live" / "ipo"
-APPENDABLE = ("run_log.jsonl", "bhavcopy/misses.jsonl", "decisions.jsonl")
+APPENDABLE = (
+    "run_log.jsonl",
+    "bhavcopy/misses.jsonl",
+    "decisions.jsonl",
+    "launch_failures.jsonl",  # written by scripts/run_ipo_task.ps1
+)
 NO_PROMPTS = {"GIT_TERMINAL_PROMPT": "0", "GCM_INTERACTIVE": "never"}
 
 

@@ -263,12 +263,54 @@ def test_a_symbol_already_trading_on_the_close_day_is_not_a_listing(tmp_path):
     assert "already trades" in run.warnings[0]
 
 
+def test_a_backfill_finds_the_listing_and_the_advert_after_the_advert_window(recorder):
+    fake, root, run = recorder
+    fake.nse_bodies[CURRENT] = json.dumps(current_rows()).encode()
+    bid_day, close = "Updated as on 29-Oct-2026 11:00:00", "Updated as on 02-Nov-2026 23:00:00"
+    fake.nse_bodies[DETAIL] = json.dumps(detail(stamp=bid_day)).encode()
+    run(ist(2026, 10, 29, 12, 0))
+    fake.nse_bodies[CURRENT] = b"[]"
+    fake.nse_bodies[DETAIL] = json.dumps(detail(stamp=close)).encode()
+    run(ist(2026, 11, 3, 12, 0))  # final book; no bhavcopy out yet
+    for n in (2, 3, 4):
+        fake.archive_bodies[bhavcopy_url(date(2026, 11, n))] = udiff_zip(date(2026, 11, n), [OTHER])
+    listed = ("BCSSL", "EQ", "INE0BC001010", 96.0, 97.5, 82.0)
+    fake.archive_bodies[bhavcopy_url(date(2026, 11, 5))] = udiff_zip(date(2026, 11, 5), [listed])
+    fake.archive_bodies[ADVERT_URL.format(name="ADV_INE0BC001010_04NOV2026.pdf")] = b"%PDF-1.7 x"
+    late = ist(2026, 11, 21, 18, 0)  # 16 days after listing: past the 7-day advert window
+
+    t = next(x for x in ipo_live_steps.tracked(root) if x.issue_id == "BCSSL_20261029")
+    normal = ipo_live_steps.Run(clock=lambda: late, started_at=late, scheduled=False)
+    ipo_live_steps.after_close(fake.net(), normal, root, t, late.date(), HOLIDAYS_2026)
+    assert [a["kind"] for a in normal.actions] == ["listing"]  # listing saved, no advert probe
+    assert not (root / "BCSSL_20261029" / "ADV_INE0BC001010_04NOV2026.pdf").exists()
+
+    r = record_ipo_live.backfill_once(
+        fake.net(), root, HOLIDAYS_2026, "BCSSL_20261029", lambda: late, {}
+    )
+    assert [a["kind"] for a in r.actions] == ["advert"] and not r.errors
+    assert (root / "BCSSL_20261029" / "ADV_INE0BC001010_04NOV2026.pdf").read_bytes() == (
+        b"%PDF-1.7 x"
+    )
+    last = json.loads((root / "run_log.jsonl").read_text("utf-8").splitlines()[-1])
+    assert last["backfill"] == "BCSSL_20261029" and last["scheduled"] is False and last["ok"]
+    assert "slot" not in last  # covers no slot; the v2 decision step ignores it
+
+
+def test_a_backfill_of_an_unknown_issue_fails_and_is_logged(recorder):
+    fake, root, _ = recorder
+    at = ist(2026, 11, 21, 18, 0)
+    r = record_ipo_live.backfill_once(fake.net(), root, HOLIDAYS_2026, "NOPE_1", lambda: at, {})
+    assert r.errors and fake.calls == []
+    assert json.loads((root / "run_log.jsonl").read_text("utf-8"))["ok"] is False
+
+
 def test_the_task_definition_wakes_the_pc_three_times_a_weekday():
     import xml.etree.ElementTree as ET
 
     import make_ipo_task_xml
 
-    xml = make_ipo_task_xml.task_xml(date(2026, 11, 2), r"C:\uv\uv.exe", REPO_ROOT, r"PC\me")
+    xml = make_ipo_task_xml.task_xml(date(2026, 11, 2), r"C:\py\python.exe", REPO_ROOT, r"PC\me")
     ns = {"t": "http://schemas.microsoft.com/windows/2004/02/mit/task"}
     root = ET.fromstring(xml.encode("utf-16"))
     starts = [e.text for e in root.findall(".//t:CalendarTrigger/t:StartBoundary", ns)]
@@ -288,8 +330,14 @@ def test_the_task_definition_wakes_the_pc_three_times_a_weekday():
     settings = {e.tag.split("}")[1]: e.text for e in root.find("t:Settings", ns)}
     assert settings["WakeToRun"] == "true" and settings["StartWhenAvailable"] == "true"
     assert settings["DisallowStartIfOnBatteries"] == "false"
+    assert root.find(".//t:Command", ns).text == make_ipo_task_xml.POWERSHELL
     args = root.find(".//t:Arguments", ns).text
-    assert args == "run --frozen python scripts/record_ipo_live.py --scheduled"
+    wrapper = REPO_ROOT / "scripts" / "run_ipo_task.ps1"
+    assert args == (
+        f'-NoProfile -NonInteractive -File "{wrapper}" "C:\\py\\python.exe" '
+        "-s scripts/venv_run.py scripts/record_ipo_live.py --scheduled"
+    )
+    assert wrapper.exists() and (REPO_ROOT / "scripts" / "venv_run.py").exists()
     check = make_ipo_task_xml.task_xml(
         date(2026, 11, 2), "uv.exe", REPO_ROOT, r"PC\me", "run --frozen x --check-env r", False
     )

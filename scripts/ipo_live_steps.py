@@ -216,9 +216,16 @@ def probe_advert(net: Net, run: Run, root: Path, t: Tracked, listed: dict, today
 
 
 def after_close(
-    net: Net, run: Run, root: Path, t: Tracked, today: date, holidays: set[date]
+    net: Net,
+    run: Run,
+    root: Path,
+    t: Tracked,
+    today: date,
+    holidays: set[date],
+    advert_window: bool = True,
 ) -> None:
-    """Final book, listing day and advert for an issue past its close day."""
+    """Final book, listing day and advert for an issue past its close day. With
+    advert_window False the advert is probed even after its 7-day window (a backfill)."""
     if t.issue_close is None:
         run.warn(f"{t.issue_id}: no per-issue JSON of this bid period on disk; skipped")
         return
@@ -237,7 +244,8 @@ def after_close(
             run.fail(f"{t.issue_id} listing: {err!r}")
     if listed is None or t.advert is not None:
         return
-    if today <= date.fromisoformat(listed["listing_date"]) + timedelta(days=ADVERT_WINDOW_DAYS):
+    advert_until = date.fromisoformat(listed["listing_date"]) + timedelta(days=ADVERT_WINDOW_DAYS)
+    if today <= advert_until or not advert_window:
         try:
             probe_advert(net, run, root, t, listed, today)
         except Exception as err:
